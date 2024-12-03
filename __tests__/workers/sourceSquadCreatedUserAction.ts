@@ -5,15 +5,17 @@ import createOrGetConnection from '../../src/db';
 import {
   SourceType,
   SquadSource,
-  SourceMember,
   User,
   Source,
   UserAction,
   UserActionType,
+  Feed,
 } from '../../src/entity';
 import { SourceMemberRoles } from '../../src/roles';
 import { usersFixture } from '../fixture/user';
 import { createSource } from '../fixture/source';
+import { ContentPreferenceSource } from '../../src/entity/contentPreference/ContentPreferenceSource';
+import { ContentPreferenceStatus } from '../../src/entity/contentPreference/types';
 
 let con: DataSource;
 
@@ -25,6 +27,11 @@ beforeEach(async () => {
   jest.resetAllMocks();
 
   await saveFixtures(con, User, usersFixture);
+  await saveFixtures(
+    con,
+    Feed,
+    usersFixture.map((u) => ({ id: u.id, userId: u.id })),
+  );
   await con
     .getRepository(SquadSource)
     .save([
@@ -35,18 +42,30 @@ beforeEach(async () => {
         SourceType.Squad,
       ),
     ]);
-  await con.getRepository(SourceMember).save({
-    sourceId: 'squadCreatedUA_s1',
-    userId: '2',
-    referralToken: 'sourceSquadCreatedUserAction_rt1',
-    role: SourceMemberRoles.Admin,
-  });
-  await con.getRepository(SourceMember).save({
-    sourceId: 'squadCreatedUA_s1',
-    userId: '1',
-    referralToken: 'sourceSquadCreatedUserAction_rt2',
-    role: SourceMemberRoles.Admin,
-  });
+  await con.getRepository(ContentPreferenceSource).save([
+    {
+      sourceId: 'squadCreatedUA_s1',
+      referenceId: 'squadCreatedUA_s1',
+      userId: '2',
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: 'sourceSquadCreatedUserAction_rt1',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '2',
+    },
+    {
+      sourceId: 'squadCreatedUA_s1',
+      referenceId: 'squadCreatedUA_s1',
+      userId: '1',
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: 'sourceSquadCreatedUserAction_rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
+    },
+  ]);
 });
 
 describe('sourceSquadCreatedUserAction worker', () => {

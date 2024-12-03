@@ -15,7 +15,6 @@ import {
   MachineSource,
   Source,
   SourceFeed,
-  SourceMember,
   SourceRequest,
   SquadPublicRequest,
   SquadPublicRequestStatus,
@@ -34,6 +33,7 @@ import {
 import { ConnectionArguments } from 'graphql-relay';
 import { SourceMemberRoles } from '../roles';
 import { MoreThan } from 'typeorm';
+import { ContentPreferenceSource } from '../entity/contentPreference/ContentPreferenceSource';
 
 export interface GQLSourceRequest {
   id: string;
@@ -453,11 +453,11 @@ const ensureSourceRole = async (
     .findOneByOrFail([{ id: sourceId }, { handle: sourceId }]);
   const sourceMember = ctx.userId
     ? await ctx.con
-        .getRepository(SourceMember)
-        .findOneBy({ sourceId: source.id, userId: ctx.userId })
+        .getRepository(ContentPreferenceSource)
+        .findOneBy({ referenceId: source.id, userId: ctx.userId })
     : null;
 
-  if (!sourceMember || sourceMember.role !== role) {
+  if (!sourceMember || sourceMember.flags.role !== role) {
     throw new ForbiddenError('Access denied!');
   }
 

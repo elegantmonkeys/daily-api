@@ -1,0 +1,340 @@
+[
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser",
+    "role": "admin",
+    "createdAt": "2024-07-01 10:48:13.433031",
+    "flags": {
+      "role": "admin",
+      "referralToken": "token1"
+    },
+    "status": "subscribed",
+    "feedId": "testuser"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser1",
+    "role": "member",
+    "createdAt": "2024-07-02 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token2"
+    },
+    "status": "subscribed",
+    "feedId": "testuser1"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser2",
+    "role": "member",
+    "createdAt": "2024-07-03 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token3"
+    },
+    "status": "subscribed",
+    "feedId": "testuser2"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser3",
+    "role": "member",
+    "createdAt": "2024-07-04 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token4"
+    },
+    "status": "subscribed",
+    "feedId": "testuser3"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser4",
+    "role": "member",
+    "createdAt": "2024-07-05 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token5"
+    },
+    "status": "subscribed",
+    "feedId": "testuser4"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser5",
+    "role": "member",
+    "createdAt": "2024-07-06 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token6"
+    },
+    "status": "subscribed",
+    "feedId": "testuser5"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser6",
+    "role": "member",
+    "createdAt": "2024-07-07 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token7"
+    },
+    "status": "subscribed",
+    "feedId": "testuser6"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser7",
+    "role": "member",
+    "createdAt": "2024-07-08 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token8"
+    },
+    "status": "subscribed",
+    "feedId": "testuser7"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser8",
+    "role": "member",
+    "createdAt": "2024-07-09 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token9"
+    },
+    "status": "subscribed",
+    "feedId": "testuser8"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser9",
+    "role": "member",
+    "createdAt": "2024-07-10 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token10"
+    },
+    "status": "subscribed",
+    "feedId": "testuser9"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser10",
+    "role": "member",
+    "createdAt": "2024-07-11 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token11"
+    },
+    "status": "subscribed",
+    "feedId": "testuser10"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser11",
+    "role": "member",
+    "createdAt": "2024-07-12 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token12"
+    },
+    "status": "subscribed",
+    "feedId": "testuser11"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser12",
+    "role": "member",
+    "createdAt": "2024-07-13 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token13"
+    },
+    "status": "subscribed",
+    "feedId": "testuser12"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser13",
+    "role": "member",
+    "createdAt": "2024-07-14 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token14"
+    },
+    "status": "subscribed",
+    "feedId": "testuser13"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser14",
+    "role": "member",
+    "createdAt": "2024-07-15 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token15"
+    },
+    "status": "subscribed",
+    "feedId": "testuser14"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser15",
+    "role": "member",
+    "createdAt": "2024-07-16 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token16"
+    },
+    "status": "subscribed",
+    "feedId": "testuser15"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser16",
+    "role": "member",
+    "createdAt": "2024-07-17 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token17"
+    },
+    "status": "subscribed",
+    "feedId": "testuser16"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser17",
+    "role": "member",
+    "createdAt": "2024-07-18 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token18"
+    },
+    "status": "subscribed",
+    "feedId": "testuser17"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser18",
+    "role": "member",
+    "createdAt": "2024-07-19 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token19"
+    },
+    "status": "subscribed",
+    "feedId": "testuser18"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser19",
+    "role": "member",
+    "createdAt": "2024-07-20 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token20"
+    },
+    "status": "subscribed",
+    "feedId": "testuser19"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser20",
+    "role": "member",
+    "createdAt": "2024-07-21 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token21"
+    },
+    "status": "subscribed",
+    "feedId": "testuser20"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser21",
+    "role": "member",
+    "createdAt": "2024-07-22 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token22"
+    },
+    "status": "subscribed",
+    "feedId": "testuser21"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser22",
+    "role": "member",
+    "createdAt": "2024-07-23 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token23"
+    },
+    "status": "subscribed",
+    "feedId": "testuser22"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser23",
+    "role": "member",
+    "createdAt": "2024-07-24 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token24"
+    },
+    "status": "subscribed",
+    "feedId": "testuser23"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser24",
+    "role": "member",
+    "createdAt": "2024-07-25 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token25"
+    },
+    "status": "subscribed",
+    "feedId": "testuser24"
+  },
+  {
+    "sourceId": "publicsquad",
+    "referenceId": "publicsquad",
+    "userId": "testuser25",
+    "role": "member",
+    "createdAt": "2024-07-26 10:48:13.433031",
+    "flags": {
+      "role": "member",
+      "referralToken": "token26"
+    },
+    "status": "subscribed",
+    "feedId": "testuser25"
+  }
+]

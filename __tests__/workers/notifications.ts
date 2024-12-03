@@ -14,7 +14,6 @@ import {
   PostType,
   Settings,
   Source,
-  SourceMember,
   SourceType,
   SquadSource,
   SubmissionStatus,
@@ -45,16 +44,24 @@ import {
   NotificationPreferenceStatus,
   NotificationType,
 } from '../../src/notifications/common';
-import { createSquadWelcomePost, NotificationReason } from '../../src/common';
+import {
+  createSquadWelcomePost,
+  NotificationReason,
+  updateFlagsStatement,
+} from '../../src/common';
 import { randomUUID } from 'crypto';
-import { UserVote } from '../../src/types';
+import { ChangeObject, UserVote } from '../../src/types';
 import { UserComment } from '../../src/entity/user/UserComment';
 import { workers } from '../../src/workers';
 import { generateStorageKey, StorageKey, StorageTopic } from '../../src/config';
 import { ioRedisPool, setRedisObject } from '../../src/redis';
 import { ReportReason } from '../../src/entity/common';
 import { ContentPreferenceUser } from '../../src/entity/contentPreference/ContentPreferenceUser';
-import { ContentPreferenceStatus } from '../../src/entity/contentPreference/types';
+import {
+  ContentPreferenceStatus,
+  ContentPreferenceType,
+} from '../../src/entity/contentPreference/types';
+import { ContentPreferenceSource } from '../../src/entity/contentPreference/ContentPreferenceSource';
 
 let con: DataSource;
 
@@ -65,6 +72,11 @@ beforeAll(async () => {
 beforeEach(async () => {
   jest.resetAllMocks();
   await con.getRepository(User).save(usersFixture);
+  await saveFixtures(
+    con,
+    Feed,
+    usersFixture.map((u) => ({ id: u.id, userId: u.id })),
+  );
   await con.getRepository(MachineSource).save(sourcesFixture);
   await con.getRepository(Post).save([postsFixture[0], postsFixture[1]]);
   await con.getRepository(Comment).save([
@@ -184,39 +196,69 @@ describe('squad featured updated notification', () => {
 
   beforeEach(async () => {
     await saveFixtures(con, User, badUsersFixture);
+    await saveFixtures(
+      con,
+      Feed,
+      badUsersFixture.map((u) => ({ id: u.id, userId: u.id })),
+    );
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
-        role: SourceMemberRoles.Admin,
         sourceId: 'a',
+        referenceId: 'a',
         userId: '1',
-        referralToken: 't1',
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: 't1',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
-        role: SourceMemberRoles.Admin,
         sourceId: 'a',
+        referenceId: 'a',
         userId: '2',
-        referralToken: 't2',
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: 't2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
       },
       {
-        role: SourceMemberRoles.Moderator,
         sourceId: 'a',
+        referenceId: 'a',
         userId: '3',
-        referralToken: 't3',
+        flags: {
+          role: SourceMemberRoles.Moderator,
+          referralToken: 't3',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '3',
       },
       {
-        role: SourceMemberRoles.Member,
         sourceId: 'a',
+        referenceId: 'a',
         userId: '4',
-        referralToken: 't4',
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 't4',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '4',
       },
       {
-        role: SourceMemberRoles.Blocked,
         sourceId: 'a',
+        referenceId: 'a',
         userId: 'low-score',
-        referralToken: 't5',
+        flags: {
+          role: SourceMemberRoles.Blocked,
+          referralToken: 't5',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: 'low-score',
       },
     ]);
   });
@@ -255,9 +297,11 @@ describe('squad featured updated notification', () => {
     expect((actual![0].ctx as NotificationSourceContext).source.id).toEqual(
       source!.id,
     );
-    const admins = await con.getRepository(SourceMember).findBy({
-      role: SourceMemberRoles.Admin,
-    });
+    const admins = await con
+      .getRepository(ContentPreferenceSource)
+      .createQueryBuilder()
+      .where(`flags->>'role' = :role`, { role: SourceMemberRoles.Admin })
+      .getMany();
     const adminsFound = admins.every((admin) =>
       actual![0].ctx.userIds.includes(admin.userId),
     );
@@ -276,9 +320,11 @@ describe('squad featured updated notification', () => {
     expect((actual![0].ctx as NotificationSourceContext).source.id).toEqual(
       source!.id,
     );
-    const mods = await con.getRepository(SourceMember).findBy({
-      role: SourceMemberRoles.Moderator,
-    });
+    const mods = await con
+      .getRepository(ContentPreferenceSource)
+      .createQueryBuilder()
+      .where(`flags->>'role' = :role`, { role: SourceMemberRoles.Moderator })
+      .getMany();
     const modsFound = mods.every((mod) =>
       actual![0].ctx.userIds.includes(mod.userId),
     );
@@ -297,9 +343,11 @@ describe('squad featured updated notification', () => {
     expect((actual![0].ctx as NotificationSourceContext).source.id).toEqual(
       source!.id,
     );
-    const members = await con.getRepository(SourceMember).findBy({
-      role: SourceMemberRoles.Member,
-    });
+    const members = await con
+      .getRepository(ContentPreferenceSource)
+      .createQueryBuilder()
+      .where(`flags->>'role' = :role`, { role: SourceMemberRoles.Member })
+      .getMany();
     const membersNotFound = members.every(
       (member) => !actual![0].ctx.userIds.includes(member.userId),
     );
@@ -318,9 +366,11 @@ describe('squad featured updated notification', () => {
     expect((actual![0].ctx as NotificationSourceContext).source.id).toEqual(
       source!.id,
     );
-    const blocked = await con.getRepository(SourceMember).findBy({
-      role: SourceMemberRoles.Blocked,
-    });
+    const blocked = await con
+      .getRepository(ContentPreferenceSource)
+      .createQueryBuilder()
+      .where(`flags->>'role' = :role`, { role: SourceMemberRoles.Blocked })
+      .getMany();
     const blockedNotFound = blocked.every(
       (member) => !actual![0].ctx.userIds.includes(member.userId),
     );
@@ -329,10 +379,18 @@ describe('squad featured updated notification', () => {
 });
 
 describe('source member role changed', () => {
-  const baseMember = {
+  const baseMember: ChangeObject<ContentPreferenceSource> = {
     userId: '1',
     sourceId: 'squad',
-    referralToken: 'rt1',
+    referenceId: 'squad',
+    flags: {
+      role: SourceMemberRoles.Member,
+      referralToken: 'rt1',
+    },
+    feedId: '1',
+    status: ContentPreferenceStatus.Subscribed,
+    type: ContentPreferenceType.Source,
+    createdAt: Date.now(),
   };
 
   it('should add blocked notification', async () => {
@@ -341,7 +399,13 @@ describe('source member role changed', () => {
     );
     const actual = await invokeNotificationWorker(worker.default, {
       previousRole: SourceMemberRoles.Member,
-      sourceMember: { ...baseMember, role: SourceMemberRoles.Blocked },
+      sourceMember: {
+        ...baseMember,
+        flags: {
+          ...baseMember.flags,
+          role: SourceMemberRoles.Blocked,
+        },
+      },
     });
     const source = await con.getRepository(Source).findOneBy({ id: 'squad' });
     expect(actual.length).toEqual(1);
@@ -354,7 +418,13 @@ describe('source member role changed', () => {
     );
     const actual = await invokeNotificationWorker(worker.default, {
       previousRole: SourceMemberRoles.Member,
-      sourceMember: { ...baseMember, role: SourceMemberRoles.Moderator },
+      sourceMember: {
+        ...baseMember,
+        flags: {
+          ...baseMember.flags,
+          role: SourceMemberRoles.Moderator,
+        },
+      },
     });
     const source = await con.getRepository(Source).findOneBy({ id: 'squad' });
 
@@ -368,7 +438,13 @@ describe('source member role changed', () => {
     );
     const actual = await invokeNotificationWorker(worker.default, {
       previousRole: SourceMemberRoles.Member,
-      sourceMember: { ...baseMember, role: SourceMemberRoles.Admin },
+      sourceMember: {
+        ...baseMember,
+        flags: {
+          ...baseMember.flags,
+          role: SourceMemberRoles.Admin,
+        },
+      },
     });
     const source = await con.getRepository(Source).findOneBy({ id: 'squad' });
 
@@ -385,7 +461,13 @@ describe('source member role changed', () => {
     );
     const actual = await invokeNotificationWorker(worker.default, {
       previousRole: SourceMemberRoles.Moderator,
-      sourceMember: { ...baseMember, role: SourceMemberRoles.Member },
+      sourceMember: {
+        ...baseMember,
+        flags: {
+          ...baseMember.flags,
+          role: SourceMemberRoles.Member,
+        },
+      },
     });
     const source = await con.getRepository(Source).findOneBy({ id: 'squad' });
 
@@ -403,7 +485,13 @@ describe('source member role changed', () => {
     );
     const actual = await invokeNotificationWorker(worker.default, {
       previousRole: SourceMemberRoles.Moderator,
-      sourceMember: { ...baseMember, role: SourceMemberRoles.Admin },
+      sourceMember: {
+        ...baseMember,
+        flags: {
+          ...baseMember.flags,
+          role: SourceMemberRoles.Admin,
+        },
+      },
     });
     const source = await con.getRepository(Source).findOneBy({ id: 'squad' });
     expect(actual.length).toEqual(1);
@@ -419,7 +507,13 @@ describe('source member role changed', () => {
     );
     const actual = await invokeNotificationWorker(worker.default, {
       previousRole: SourceMemberRoles.Admin,
-      sourceMember: { ...baseMember, role: SourceMemberRoles.Member },
+      sourceMember: {
+        ...baseMember,
+        flags: {
+          ...baseMember.flags,
+          role: SourceMemberRoles.Member,
+        },
+      },
     });
     const source = await con.getRepository(Source).findOneBy({ id: 'squad' });
 
@@ -437,7 +531,13 @@ describe('source member role changed', () => {
     );
     const actual = await invokeNotificationWorker(worker.default, {
       previousRole: SourceMemberRoles.Admin,
-      sourceMember: { ...baseMember, role: SourceMemberRoles.Moderator },
+      sourceMember: {
+        ...baseMember,
+        flags: {
+          ...baseMember.flags,
+          role: SourceMemberRoles.Moderator,
+        },
+      },
     });
     const source = await con.getRepository(Source).findOneBy({ id: 'squad' });
 
@@ -459,11 +559,16 @@ describe('post added notifications', () => {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
-    await con.getRepository(SourceMember).save({
-      userId: '2',
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
-      role: SourceMemberRoles.Member,
-      referralToken: 'random',
+      referenceId: 'a',
+      userId: '2',
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'random',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '2',
     });
     const actual = await invokeNotificationWorker(worker.default, {
       post: postsFixture[0],
@@ -544,12 +649,16 @@ describe('post added notifications', () => {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
-    await con.getRepository(SourceMember).insert({
-      userId: '2',
+    await con.getRepository(ContentPreferenceSource).insert({
       sourceId: 'a',
-      role: SourceMemberRoles.Blocked,
-      createdAt: new Date(),
-      referralToken: randomUUID(),
+      referenceId: 'a',
+      userId: '2',
+      flags: {
+        role: SourceMemberRoles.Blocked,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '2',
     });
     const worker = await import('../../src/workers/notifications/postAdded');
     await con.getRepository(Post).update({ id: 'p1' }, { authorId: '1' });
@@ -604,18 +713,28 @@ describe('post added notifications', () => {
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
     await con.getRepository(Post).update({ id: 'p1' }, { authorId: '1' });
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '2',
-        referralToken: 'rt1',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt1',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
       },
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '3',
-        referralToken: 'rt2',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '3',
       },
     ]);
     const actual = await invokeNotificationWorker(worker.default, {
@@ -636,18 +755,28 @@ describe('post added notifications', () => {
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
     await con.getRepository(Post).update({ id: 'p1' }, { authorId: '1' });
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '2',
-        referralToken: 'rt1',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt1',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
       },
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '3',
-        referralToken: 'rt2',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '3',
       },
     ]);
     await con.getRepository(PostMention).save({
@@ -673,18 +802,28 @@ describe('post added notifications', () => {
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
     await con.getRepository(Post).update({ id: 'p1' }, { authorId: '1' });
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '2',
-        referralToken: 'rt1',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt1',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
       },
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '3',
-        referralToken: 'rt2',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '3',
       },
     ]);
     await con.getRepository(NotificationPreferenceSource).save({
@@ -1136,12 +1275,14 @@ describe('article new comment', () => {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { sourceId: 'a', userId: '1' },
-        { role: SourceMemberRoles.Blocked },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { sourceId: 'a', userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
     await con.getRepository(Post).update({ id: 'p1' }, { authorId: '1' });
     const actual = await invokeNotificationWorker(worker.default, {
       userId: '1',
@@ -1159,8 +1300,8 @@ describe('article new comment', () => {
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
     await con
-      .getRepository(SourceMember)
-      .delete({ sourceId: 'a', userId: '1' });
+      .getRepository(ContentPreferenceSource)
+      .delete({ referenceId: 'a', userId: '1' });
     await con.getRepository(Post).update({ id: 'p1' }, { authorId: '1' });
     const actual = await invokeNotificationWorker(worker.default, {
       userId: '1',
@@ -1183,12 +1324,17 @@ describe('article new comment', () => {
         authorId: '1',
       },
     );
-    await con.getRepository(SourceMember).insert({
-      userId: '1',
+    await con.getRepository(ContentPreferenceSource).insert({
       sourceId: 'a',
-      role: SourceMemberRoles.Member,
+      referenceId: 'a',
+      userId: '1',
       createdAt: new Date(),
-      referralToken: randomUUID(),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     const actual = await invokeNotificationWorker(worker.default, {
       userId: '1',
@@ -1224,12 +1370,17 @@ describe('article new comment', () => {
         authorId: '1',
       },
     );
-    await con.getRepository(SourceMember).insert({
-      userId: '1',
+    await con.getRepository(ContentPreferenceSource).insert({
       sourceId: 'a',
-      role: SourceMemberRoles.Member,
+      referenceId: 'a',
+      userId: '1',
       createdAt: new Date(),
-      referralToken: randomUUID(),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     await con.getRepository(NotificationPreferencePost).save({
       userId: '1',
@@ -1271,10 +1422,14 @@ describe('article upvote milestone', () => {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
-    const repo = con.getRepository(SourceMember);
+    const repo = con.getRepository(ContentPreferenceSource);
     await repo.update(
       { userId: '1', sourceId: 'a' },
-      { role: SourceMemberRoles.Blocked },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
     );
     await repo.delete({ userId: '3', sourceId: 'a' });
     const actual = await invokeNotificationWorker(worker.default, {
@@ -1743,7 +1898,7 @@ describe('comment upvote milestone', () => {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
-    const repo = con.getRepository(SourceMember);
+    const repo = con.getRepository(ContentPreferenceSource);
     await con.getRepository(Comment).update({ id: 'c1' }, { upvotes: 3 });
     await con.getRepository(UserComment).save([
       {
@@ -1754,7 +1909,11 @@ describe('comment upvote milestone', () => {
       { userId: '4', commentId: 'c1', vote: UserVote.Up },
     ]);
     const params = { userId: '1', sourceId: 'a' };
-    await repo.update(params, { role: SourceMemberRoles.Blocked });
+    await repo.update(params, {
+      flags: updateFlagsStatement<ContentPreferenceSource>({
+        role: SourceMemberRoles.Blocked,
+      }),
+    });
     const actual1 = await invokeNotificationWorker(worker.default, {
       userId: '1',
       commentId: 'c1',
@@ -1831,12 +1990,17 @@ describe('squad member joined', () => {
       .update({ id: 'a' }, { type: SourceType.Squad });
     const source = await con.getRepository(Source).findOneBy({ id: 'a' });
     await createSquadWelcomePost(con, source as SquadSource, '1');
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '2',
-        referralToken: 'rt1',
-        role: SourceMemberRoles.Admin,
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: 'rt1',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
       },
     ]);
   };
@@ -1850,6 +2014,7 @@ describe('squad member joined', () => {
       sourceMember: {
         sourceId: 'a',
         userId: '1',
+        flags: {},
       },
     });
     expect(actual.length).toEqual(1);
@@ -1866,11 +2031,16 @@ describe('squad member joined', () => {
       '../../src/workers/notifications/squadMemberJoined'
     );
     await prepareSquad();
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
+      referenceId: 'a',
       userId: '3',
-      role: SourceMemberRoles.Admin,
-      referralToken: 'token',
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: 'token',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '3',
     });
     await con.getRepository(NotificationPreferenceSource).save({
       userId: '3',
@@ -1883,6 +2053,7 @@ describe('squad member joined', () => {
       sourceMember: {
         sourceId: 'a',
         userId: '1',
+        flags: {},
       },
     });
     expect(actual.length).toEqual(1);
@@ -1898,18 +2069,24 @@ describe('squad member joined', () => {
     const worker = await import(
       '../../src/workers/notifications/squadMemberJoined'
     );
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '2',
-        referralToken: 'rt1',
-        role: SourceMemberRoles.Admin,
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: 'rt1',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
       },
     ]);
     const actual = await invokeNotificationWorker(worker.default, {
       sourceMember: {
         sourceId: 'a',
         userId: '2',
+        flags: {},
       },
     });
     expect(actual).toBeFalsy();
@@ -1926,19 +2103,26 @@ describe('squad member joined', () => {
     const repo = con.getRepository(UserAction);
     const exists = await repo.findOneBy(params);
     expect(exists).toBeFalsy();
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '2',
-        referralToken: 'rt1',
-        role,
+        flags: {
+          role,
+          referralToken: 'rt1',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
       },
     ]);
     await invokeNotificationWorker(worker.default, {
       sourceMember: {
         sourceId: 'a',
         userId: '2',
-        role,
+        flags: {
+          role,
+        },
       },
     });
 
@@ -1950,6 +2134,7 @@ describe('squad member joined', () => {
       sourceMember: {
         sourceId: 'a',
         userId: '2',
+        flags: {},
       },
     });
     const createSquad = await repo.findOneBy(params);
@@ -1972,6 +2157,7 @@ describe('squad member joined', () => {
       sourceMember: {
         sourceId: 'a',
         userId: '1',
+        flags: {},
       },
     });
     expect(actual).toBeUndefined();

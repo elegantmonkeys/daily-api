@@ -6,7 +6,6 @@ import {
   Submission,
   User,
   CommentMention,
-  SourceMember,
   Feature,
   Source,
   ArticlePost,
@@ -34,6 +33,7 @@ import { FastifyLoggerInstance } from 'fastify';
 import pino from 'pino';
 import { PersonalizedDigestFeatureConfig } from '../growthbook';
 import { Message as ProtobufMessage } from '@bufbuild/protobuf';
+import { ContentPreferenceSource } from '../entity/contentPreference/ContentPreferenceSource';
 
 export const pubsub = new PubSub();
 const postCommentedTopic = pubsub.topic('post-commented');
@@ -270,7 +270,7 @@ export const notifySubmissionGrantedAccess = async (
 export const notifySourceMemberRoleChanged = async (
   log: EventLogger,
   previousRole: SourceMemberRoles,
-  sourceMember: ChangeObject<SourceMember>,
+  sourceMember: ChangeObject<ContentPreferenceSource>,
 ): Promise<void> =>
   publishEvent(log, sourceMemberRoleChangedTopic, {
     previousRole,
@@ -295,7 +295,7 @@ export const notifyNewCommentMention = async (
 
 export const notifyMemberJoinedSource = async (
   log: EventLogger,
-  sourceMember: ChangeObject<SourceMember>,
+  sourceMember: ChangeObject<ContentPreferenceSource>,
 ): Promise<void> =>
   publishEvent(log, memberJoinedSourceTopic, { sourceMember });
 

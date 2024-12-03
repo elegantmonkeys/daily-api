@@ -1,5 +1,5 @@
 import { messageToJson } from '../worker';
-import { Comment, SourceMember, SourceType } from '../../entity';
+import { Comment, SourceType } from '../../entity';
 import {
   NotificationCommentContext,
   NotificationUpvotersContext,
@@ -7,10 +7,10 @@ import {
 import { NotificationType } from '../../notifications/common';
 import { NotificationWorker } from './worker';
 import { buildPostContext, UPVOTE_MILESTONES } from './utils';
-import { Not } from 'typeorm';
 import { SourceMemberRoles } from '../../roles';
 import { UserComment } from '../../entity/user/UserComment';
 import { UserVote } from '../../types';
+import { ContentPreferenceSource } from '../../entity/contentPreference/ContentPreferenceSource';
 
 interface Data {
   userId: string;
@@ -52,11 +52,16 @@ const worker: NotificationWorker = {
     };
 
     if (source.type === SourceType.Squad) {
-      const member = await con.getRepository(SourceMember).findOneBy({
-        userId: comment.userId,
-        sourceId: source.id,
-        role: Not(SourceMemberRoles.Blocked),
-      });
+      const member = await con
+        .getRepository(ContentPreferenceSource)
+        .createQueryBuilder()
+        .select('"userId"')
+        .where('"userId" = :userId', { userId: comment.userId })
+        .andWhere('"referenceId" = :sourceId', { sourceId: source.id })
+        .andWhere(`flags->>'role' != :role`, {
+          role: SourceMemberRoles.Blocked,
+        })
+        .getRawOne<Pick<ContentPreferenceSource, 'userId'>>();
 
       if (!member) {
         return;

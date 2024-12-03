@@ -43,7 +43,10 @@ import {
   testQueryErrorCode,
 } from './helpers';
 import { ContentPreferenceSource } from '../src/entity/contentPreference/ContentPreferenceSource';
-import { ContentPreferenceStatus } from '../src/entity/contentPreference/types';
+import {
+  ContentPreferenceStatus,
+  ContentPreferenceType,
+} from '../src/entity/contentPreference/types';
 import { generateUUID } from '../src/ids';
 import {
   SourcePostModeration,
@@ -187,6 +190,100 @@ beforeEach(async () => {
   await con
     .getRepository(SourceMember)
     .update({ userId: '2', sourceId: 'b' }, { role: SourceMemberRoles.Admin });
+
+  await con.getRepository(ContentPreferenceSource).save([
+    {
+      sourceId: 'a',
+      referenceId: 'a',
+      userId: '1',
+      createdAt: new Date(now.getTime() + 0),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'rt',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
+    },
+    {
+      sourceId: 'a',
+      referenceId: 'a',
+      userId: '2',
+      createdAt: new Date(now.getTime() + 1000),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '2',
+    },
+    {
+      sourceId: 'b',
+      referenceId: 'b',
+      userId: '2',
+      createdAt: new Date(now.getTime() + 2000),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '3',
+    },
+    {
+      sourceId: 'b',
+      referenceId: 'b',
+      userId: '3',
+      createdAt: new Date(now.getTime() + 3000),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '3',
+    },
+    {
+      sourceId: 'squad',
+      referenceId: 'squad',
+      userId: '1',
+      createdAt: new Date(now.getTime() + 4000),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
+    },
+    {
+      sourceId: 'm',
+      referenceId: 'm',
+      userId: '1',
+      createdAt: new Date(now.getTime() + 5000),
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
+    },
+  ]);
+
+  await con.getRepository(ContentPreferenceSource).update(
+    {
+      userId: '1',
+    },
+    {
+      flags: updateFlagsStatement<ContentPreferenceSource>({
+        role: SourceMemberRoles.Admin,
+      }),
+    },
+  );
+  await con.getRepository(ContentPreferenceSource).update(
+    { userId: '2', referenceId: 'b' },
+    {
+      flags: updateFlagsStatement<ContentPreferenceSource>({
+        role: SourceMemberRoles.Admin,
+      }),
+    },
+  );
 });
 
 afterAll(() => disposeGraphQLTesting(state));
@@ -947,27 +1044,42 @@ query Source($id: ID!) {
 
   it('should return current member as admin', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Admin });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
+      },
+    );
     const res = await client.query(QUERY, { variables: { id: 'a' } });
     expect(res.data).toMatchSnapshot();
   });
 
   it('should return current member as member', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Member });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Member,
+        }),
+      },
+    );
     const res = await client.query(QUERY, { variables: { id: 'a' } });
     expect(res.data).toMatchSnapshot();
   });
 
   it('should return current member as blocked', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Blocked });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
     const res = await client.query(QUERY, { variables: { id: 'a' } });
     expect(res.data.source).toBeNull();
   });
@@ -980,12 +1092,17 @@ query Source($id: ID!) {
       name: 'Restricted Squad',
       memberPostingRank: sourceRoleRank[SourceMemberRoles.Moderator],
     });
-    await con.getRepository(SourceMember).save({
-      userId: '1',
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'restrictedsquad1',
-      role: SourceMemberRoles.Member,
-      referralToken: 'restrictedsquadtoken',
+      referenceId: 'restrictedsquad1',
+      userId: '1',
       createdAt: new Date(2022, 11, 19),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'restrictedsquadtoken',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     const res = await client.query(QUERY, {
       variables: { id: 'restrictedsquad1' },
@@ -1005,12 +1122,17 @@ query Source($id: ID!) {
       name: 'Restricted Squad',
       memberInviteRank: sourceRoleRank[SourceMemberRoles.Moderator],
     });
-    await con.getRepository(SourceMember).save({
-      userId: '1',
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'restrictedsquad1',
-      role: SourceMemberRoles.Member,
-      referralToken: 'restrictedsquadtoken',
+      referenceId: 'restrictedsquad1',
+      userId: '1',
       createdAt: new Date(2022, 11, 19),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'restrictedsquadtoken',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     const res = await client.query(QUERY, {
       variables: { id: 'restrictedsquad1' },
@@ -1055,9 +1177,14 @@ query Source($id: ID!) {
 
   it('should not return private source when user is blocked', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Blocked });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
     await con.getRepository(Source).update({ id: 'a' }, { private: true });
     return testQueryErrorCode(
       client,
@@ -1118,11 +1245,17 @@ query Source($id: ID!) {
         { id: 'a' },
         { handle: 'handle', private: false, type: SourceType.Squad },
       );
-    await con.getRepository(SourceMember).save({
-      userId: '1',
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
-      role: SourceMemberRoles.Member,
-      referralToken: 'referraltoken1',
+      referenceId: 'a',
+      userId: '1',
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'referraltoken1',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
+      type: ContentPreferenceType.Source,
     });
     const res = await client.query(QUERY, { variables: { id: 'handle' } });
     expect(res.errors).toBeFalsy();
@@ -1152,11 +1285,17 @@ query Source($id: ID!) {
         { id: 'a' },
         { handle: 'handle', private: true, type: SourceType.Squad },
       );
-    await con.getRepository(SourceMember).save({
-      userId: '1',
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
-      role: SourceMemberRoles.Member,
-      referralToken: 'referraltoken1',
+      referenceId: 'a',
+      userId: '1',
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'referraltoken1',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
+      type: ContentPreferenceType.Source,
     });
     const res = await client.query(QUERY, { variables: { id: 'handle' } });
     expect(res.errors).toBeFalsy();
@@ -1170,11 +1309,17 @@ query Source($id: ID!) {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad, private: false });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
+      referenceId: 'a',
       userId: '1',
-      referralToken: 'rt2',
-      role: SourceMemberRoles.Blocked,
+      flags: {
+        role: SourceMemberRoles.Blocked,
+        referralToken: 'rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
+      type: ContentPreferenceType.Source,
     });
 
     return testQueryErrorCode(
@@ -1197,11 +1342,17 @@ describe('query source moderation fields', () => {
         moderationRequired: true,
       },
     );
-    await con.getRepository(SourceMember).save({
-      userId: '2',
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'm',
-      role: SourceMemberRoles.Member,
-      referralToken: generateUUID(),
+      referenceId: 'm',
+      userId: '2',
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: generateUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '2',
+      type: ContentPreferenceType.Source,
     });
     await con.getRepository(SourcePostModeration).save({
       sourceId: 'm',
@@ -1266,11 +1417,17 @@ query Source($id: ID!) {
 
   it('should return only my moderationPostCount', async () => {
     loggedUser = '3';
-    await con.getRepository(SourceMember).save({
-      userId: '3',
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'm',
-      role: SourceMemberRoles.Member,
-      referralToken: generateUUID(),
+      referenceId: 'm',
+      userId: '3',
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: generateUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '3',
+      type: ContentPreferenceType.Source,
     });
     const res = await client.query(QUERY, { variables: { id: 'm' } });
     expect(res.errors).toBeFalsy();
@@ -1375,9 +1532,14 @@ query Source($id: ID!) {
   });
 
   it('should exclude blocked members from result', async () => {
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Blocked });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
     const res = await client.query(QUERY, { variables: { id: 'a' } });
     expect(res.errors).toBeFalsy();
     expect(res.data).toMatchSnapshot();
@@ -1444,6 +1606,14 @@ query Source($id: ID!) {
     await con
       .getRepository(SourceMember)
       .update({ userId: '2' }, { role: SourceMemberRoles.Blocked });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
     loggedUser = '1';
     const res = await client.query(QUERY, { variables: { id: 'a' } });
     expect(res.errors).toBeFalsy();
@@ -1489,9 +1659,26 @@ describe('query sourceMembers', () => {
   });
 
   it('should return source members of public source without blocked members', async () => {
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Blocked });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
+    const res = await client.query(QUERY, { variables: { id: 'a' } });
+    expect(res.errors).toBeFalsy();
+    expect(res.data).toMatchSnapshot();
+  });
+
+  it('should return source members of source without members that blocked squad', async () => {
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        status: ContentPreferenceStatus.Blocked,
+      },
+    );
     const res = await client.query(QUERY, { variables: { id: 'a' } });
     expect(res.errors).toBeFalsy();
     expect(res.data).toMatchSnapshot();
@@ -1517,10 +1704,16 @@ describe('query sourceMembers', () => {
   });
 
   it('should return source members and order by their role', async () => {
-    const repo = con.getRepository(SourceMember);
+    const repo = con.getRepository(ContentPreferenceSource);
     await repo.update(
       { userId: '3' },
-      { role: SourceMemberRoles.Member, sourceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Member,
+        }),
+        sourceId: 'a',
+        referenceId: 'a',
+      },
     );
     const noModRes = await client.query(QUERY, { variables: { id: 'a' } });
     expect(noModRes.errors).toBeFalsy();
@@ -1532,7 +1725,13 @@ describe('query sourceMembers', () => {
 
     await repo.update(
       { userId: '3' },
-      { role: SourceMemberRoles.Moderator, sourceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+        sourceId: 'a',
+        referenceId: 'a',
+      },
     );
 
     const res = await client.query(QUERY, { variables: { id: 'a' } });
@@ -1563,12 +1762,14 @@ describe('query sourceMembers', () => {
 
   it('should not return blocked source members when user is not a moderator/admin', async () => {
     loggedUser = '2';
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '1', sourceId: 'a' },
-        { role: SourceMemberRoles.Blocked },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
     return testQueryErrorCode(
       client,
       { query: QUERY, variables: { role: SourceMemberRoles.Blocked, id: 'a' } },
@@ -1578,12 +1779,14 @@ describe('query sourceMembers', () => {
 
   it('should return blocked users only when user is the admin', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '2', sourceId: 'a' },
-        { role: SourceMemberRoles.Blocked },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
     const res = await client.query(QUERY, {
       variables: { role: SourceMemberRoles.Blocked, id: 'a' },
     });
@@ -1593,18 +1796,22 @@ describe('query sourceMembers', () => {
 
   it('should return blocked users only when user is a moderator', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '2', sourceId: 'a' },
-        { role: SourceMemberRoles.Blocked },
-      );
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '1', sourceId: 'a' },
-        { role: SourceMemberRoles.Moderator },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     const res = await client.query(QUERY, {
       variables: { role: SourceMemberRoles.Blocked, id: 'a' },
     });
@@ -1650,12 +1857,14 @@ describe('query sourceMembers', () => {
 
 describe('query mySourceMemberships', () => {
   afterEach(async () => {
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '2', sourceId: 'a' },
-        { role: SourceMemberRoles.Member },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Member,
+        }),
+      },
+    );
   });
 
   const createQuery = (type?: SourceType) => `
@@ -1693,12 +1902,14 @@ describe('query mySourceMemberships', () => {
   });
 
   it('should not return source memberships if user is blocked', async () => {
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '2', sourceId: 'a' },
-        { role: SourceMemberRoles.Blocked },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
     loggedUser = '2';
     const res = await client.query(QUERY);
     expect(res.errors).toBeFalsy();
@@ -1981,11 +2192,12 @@ describe('mutation createSquad', () => {
       sourceRoleRank[SourceMemberRoles.Member],
     );
     expect(newSource?.moderationRequired).toEqual(false);
-    const member = await con.getRepository(SourceMember).findOneBy({
+    const member = await con.getRepository(ContentPreferenceSource).findOneBy({
+      referenceId: newId,
       sourceId: newId,
       userId: '1',
     });
-    expect(member.role).toEqual(SourceMemberRoles.Admin);
+    expect(member?.flags.role).toEqual(SourceMemberRoles.Admin);
     const sharePost = await con
       .getRepository(SharePost)
       .findOneBy({ sourceId: newId });
@@ -2135,11 +2347,12 @@ describe('mutation createSquad', () => {
     expect(newSource?.memberPostingRank).toEqual(
       sourceRoleRank[SourceMemberRoles.Moderator],
     );
-    const member = await con.getRepository(SourceMember).findOneBy({
+    const member = await con.getRepository(ContentPreferenceSource).findOneBy({
+      referenceId: newId,
       sourceId: newId,
       userId: '1',
     });
-    expect(member.role).toEqual(SourceMemberRoles.Admin);
+    expect(member?.flags.role).toEqual(SourceMemberRoles.Admin);
     const post = await con
       .getRepository(SharePost)
       .findOneBy({ sourceId: newId });
@@ -2235,11 +2448,12 @@ describe('mutation createSquad', () => {
     expect(newSource?.memberInviteRank).toEqual(
       sourceRoleRank[SourceMemberRoles.Moderator],
     );
-    const member = await con.getRepository(SourceMember).findOneBy({
+    const member = await con.getRepository(ContentPreferenceSource).findOneBy({
+      referenceId: newId,
       sourceId: newId,
       userId: '1',
     });
-    expect(member.role).toEqual(SourceMemberRoles.Admin);
+    expect(member?.flags.role).toEqual(SourceMemberRoles.Admin);
     const post = await con
       .getRepository(SharePost)
       .findOneBy({ sourceId: newId });
@@ -2277,6 +2491,17 @@ describe('mutation editSquad', () => {
       userId: '1',
       referralToken: 'rt2',
       role: SourceMemberRoles.Admin,
+    });
+    await con.getRepository(ContentPreferenceSource).save({
+      sourceId: 's1',
+      referenceId: 's1',
+      userId: '1',
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: 'rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
   });
 
@@ -2455,9 +2680,14 @@ describe('mutation editSquad', () => {
 
   it(`should throw error if user is not the squad admin`, async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Member });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Member,
+        }),
+      },
+    );
     return testMutationErrorCode(
       client,
       { mutation: MUTATION, variables },
@@ -2760,9 +2990,14 @@ describe('mutation updateMemberRole', () => {
 
   it('should restrict moderator updating another member to a new role', async () => {
     loggedUser = '2';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Moderator });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     return testMutationErrorCode(
       client,
       {
@@ -2800,9 +3035,14 @@ describe('mutation updateMemberRole', () => {
 
   it('should allow admin to promote a moderator to an admin', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Moderator });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     const res = await client.mutate(MUTATION, {
       variables: {
         sourceId: 'a',
@@ -2824,9 +3064,14 @@ describe('mutation updateMemberRole', () => {
 
   it('should allow admin to demote an admin to a moderator', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Admin });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     const res = await client.mutate(MUTATION, {
       variables: {
         sourceId: 'a',
@@ -2848,9 +3093,14 @@ describe('mutation updateMemberRole', () => {
 
   it('should allow admin to demote a moderator to a member', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Moderator });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     const res = await client.mutate(MUTATION, {
       variables: {
         sourceId: 'a',
@@ -2872,9 +3122,14 @@ describe('mutation updateMemberRole', () => {
 
   it('should allow admin to remove and block an admin', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Admin });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
+      },
+    );
     const res = await client.mutate(MUTATION, {
       variables: {
         sourceId: 'a',
@@ -2896,9 +3151,14 @@ describe('mutation updateMemberRole', () => {
 
   it('should allow admin to remove and block a moderator', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Moderator });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     const res = await client.mutate(MUTATION, {
       variables: {
         sourceId: 'a',
@@ -2941,12 +3201,22 @@ describe('mutation updateMemberRole', () => {
 
   it('should restrict moderator to remove and block a moderator', async () => {
     loggedUser = '2';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Moderator });
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '3' }, { role: SourceMemberRoles.Moderator });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '3' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     return testMutationErrorCode(
       client,
       {
@@ -2963,9 +3233,14 @@ describe('mutation updateMemberRole', () => {
 
   it('should restrict moderator to remove and block an admin', async () => {
     loggedUser = '2';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Moderator });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     return testMutationErrorCode(
       client,
       {
@@ -2982,9 +3257,14 @@ describe('mutation updateMemberRole', () => {
 
   it('should allow moderator to remove and block a member', async () => {
     loggedUser = '2';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Moderator });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     const res = await client.mutate(MUTATION, {
       variables: {
         sourceId: 'a',
@@ -3072,9 +3352,14 @@ describe('mutation unblockMember', () => {
 
   it('should allow moderator to unblock a member', async () => {
     loggedUser = '2';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Moderator });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     const res = await client.mutate(MUTATION, {
       variables: { sourceId: 'a', memberId: '3' },
     });
@@ -3174,14 +3459,26 @@ describe('mutation leaveSource', () => {
 
   it('should leave squad even if the user is the admin', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Admin });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
+      },
+    );
     const res = await client.mutate(MUTATION, { variables });
     expect(res.errors).toBeFalsy();
     const sourceMembers = await con
       .getRepository(SourceMember)
       .countBy(variables);
+    expect(sourceMembers).toEqual(0);
+
+    const contentPreferences = await con
+      .getRepository(ContentPreferenceSource)
+      .countBy(variables);
+    expect(contentPreferences).toEqual(0);
+
     expect(sourceMembers).toEqual(0);
   });
 });
@@ -3207,6 +3504,18 @@ describe('mutation deleteSource', () => {
       userId: '1',
       referralToken: 'rt2',
       role: SourceMemberRoles.Member,
+    });
+    await con.getRepository(ContentPreferenceSource).save({
+      userId: '1',
+      referenceId: 's1',
+      sourceId: 's1',
+      feedId: '1',
+      status: ContentPreferenceStatus.Subscribed,
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'rt2',
+      },
+      type: ContentPreferenceType.Source,
     });
   });
 
@@ -3235,9 +3544,14 @@ describe('mutation deleteSource', () => {
 
   it('should delete source and members', async () => {
     loggedUser = '1';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Admin });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
+      },
+    );
 
     const res = await client.mutate(MUTATION, { variables });
     expect(res.errors).toBeFalsy();
@@ -3245,6 +3559,12 @@ describe('mutation deleteSource', () => {
       .getRepository(SourceMember)
       .countBy(variables);
     expect(sourceMembers).toEqual(0);
+
+    const contentPreferences = await con
+      .getRepository(ContentPreferenceSource)
+      .countBy(variables);
+    expect(contentPreferences).toEqual(0);
+
     const source = await con.getRepository(SquadSource).countBy({ id: 's1' });
     expect(source).toEqual(0);
   });
@@ -3275,6 +3595,18 @@ describe('mutation joinSource', () => {
       referralToken: 'rt2',
       role: SourceMemberRoles.Admin,
     });
+    await con.getRepository(ContentPreferenceSource).save({
+      userId: '2',
+      referenceId: 's1',
+      sourceId: 's1',
+      feedId: '2',
+      status: ContentPreferenceStatus.Subscribed,
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: 'rt2',
+      },
+      type: ContentPreferenceType.Source,
+    });
   });
 
   it('should not authorize when not logged in', () =>
@@ -3297,6 +3629,11 @@ describe('mutation joinSource', () => {
       sourceId: 's1',
       userId: '1',
     });
+    await con.getRepository(ContentPreferenceSource).findOneByOrFail({
+      userId: '1',
+      sourceId: 's1',
+      referenceId: 's1',
+    });
   });
 
   it('should add member to private squad with token', async () => {
@@ -3313,6 +3650,11 @@ describe('mutation joinSource', () => {
     await con.getRepository(SourceMember).findOneByOrFail({
       sourceId: 's1',
       userId: '1',
+    });
+    await con.getRepository(ContentPreferenceSource).findOneByOrFail({
+      userId: '1',
+      sourceId: 's1',
+      referenceId: 's1',
     });
     const source = await con.getRepository(Source).findOneBy({ id: 's1' });
     expect(source.active).toEqual(true);
@@ -3355,6 +3697,14 @@ describe('mutation joinSource', () => {
       userId: '2',
     });
     expect(member.role).toEqual(SourceMemberRoles.Admin);
+    const contentPreference = await con
+      .getRepository(ContentPreferenceSource)
+      .findOneByOrFail({
+        userId: '2',
+        sourceId: 's1',
+        referenceId: 's1',
+      });
+    expect(contentPreference.flags.role).toEqual(SourceMemberRoles.Admin);
   });
 
   it('should throw error when joining private squad without token', async () => {
@@ -3368,9 +3718,14 @@ describe('mutation joinSource', () => {
 
   it('should throw error when joining private squad when blocked', async () => {
     loggedUser = '2';
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '2' }, { role: SourceMemberRoles.Blocked });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
+      },
+    );
     return testMutationErrorCode(
       client,
       { mutation: MUTATION, variables },
@@ -3427,11 +3782,17 @@ describe('mutation joinSource', () => {
       private: true,
       memberInviteRank: sourceRoleRank[SourceMemberRoles.Moderator],
     });
-    await con.getRepository(SourceMember).save({
-      sourceId: 's1',
+    await con.getRepository(ContentPreferenceSource).save({
       userId: '2',
-      referralToken: 'rt2',
-      role: SourceMemberRoles.Member,
+      referenceId: 's1',
+      sourceId: 's1',
+      feedId: '2',
+      status: ContentPreferenceStatus.Subscribed,
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'rt2',
+      },
+      type: ContentPreferenceType.Source,
     });
 
     loggedUser = '1';
@@ -3478,34 +3839,54 @@ query Source($id: ID!) {
 
     const now = new Date(2022, 11, 19);
 
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
+        sourceId: 'c',
+        referenceId: 'c',
         userId: '1',
-        sourceId: 'c',
-        role: SourceMemberRoles.Admin,
-        referralToken: randomUUID(),
         createdAt: new Date(now.getTime() + 0),
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: randomUUID(),
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
+        sourceId: 'c',
+        referenceId: 'c',
         userId: '2',
-        sourceId: 'c',
-        role: SourceMemberRoles.Moderator,
-        referralToken: randomUUID(),
         createdAt: new Date(now.getTime() + 1000),
+        flags: {
+          role: SourceMemberRoles.Moderator,
+          referralToken: randomUUID(),
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
       },
       {
+        sourceId: 'c',
+        referenceId: 'c',
         userId: '3',
-        sourceId: 'c',
-        role: SourceMemberRoles.Moderator,
-        referralToken: randomUUID(),
         createdAt: new Date(now.getTime() + 2000),
+        flags: {
+          role: SourceMemberRoles.Moderator,
+          referralToken: randomUUID(),
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '3',
       },
       {
-        userId: '4',
         sourceId: 'c',
-        role: SourceMemberRoles.Member,
-        referralToken: randomUUID(),
+        referenceId: 'c',
+        userId: '4',
         createdAt: new Date(now.getTime() + 3000),
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: randomUUID(),
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '4',
       },
     ]);
   });
@@ -3601,8 +3982,9 @@ describe('mutation hideSourceFeedPosts', () => {
 
   it('should throw when user is not a member', async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).delete({
+    await con.getRepository(ContentPreferenceSource).delete({
       sourceId: 's1',
+      referenceId: 's1',
       userId: '1',
     });
     await testMutationErrorCode(
@@ -3617,13 +3999,16 @@ describe('mutation hideSourceFeedPosts', () => {
 
   it('should throw when user is blocked', async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).update(
+    await con.getRepository(ContentPreferenceSource).update(
       {
         sourceId: 's1',
+        referenceId: 's1',
         userId: '1',
       },
       {
-        role: SourceMemberRoles.Blocked,
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
       },
     );
     await testMutationErrorCode(
@@ -3709,8 +4094,9 @@ describe('mutation showSourceFeedPosts', () => {
 
   it('should throw when user is not a member', async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).delete({
+    await con.getRepository(ContentPreferenceSource).delete({
       sourceId: 's1',
+      referenceId: 's1',
       userId: '1',
     });
     await testMutationErrorCode(
@@ -3725,13 +4111,16 @@ describe('mutation showSourceFeedPosts', () => {
 
   it('should throw when user is blocked', async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).update(
+    await con.getRepository(ContentPreferenceSource).update(
       {
         sourceId: 's1',
+        referenceId: 's1',
         userId: '1',
       },
       {
-        role: SourceMemberRoles.Blocked,
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
       },
     );
     await testMutationErrorCode(
@@ -3753,6 +4142,11 @@ describe('mutation showSourceFeedPosts', () => {
     expect(sourceMember).toBeTruthy();
     expect(sourceMember?.flags.hideFeedPosts).toEqual(undefined);
 
+    let contentPreference = await con
+      .getRepository(ContentPreferenceSource)
+      .findOneBy({ userId: '1', referenceId: 's1' });
+    expect(contentPreference!.flags.hideFeedPosts).toEqual(undefined);
+
     await client.mutate(MUTATION, { variables: { sourceId: 's1' } });
     sourceMember = await con.getRepository(SourceMember).findOneBy({
       sourceId: 's1',
@@ -3760,7 +4154,7 @@ describe('mutation showSourceFeedPosts', () => {
     });
     expect(sourceMember?.flags.hideFeedPosts).toEqual(false);
 
-    const contentPreference = await con
+    contentPreference = await con
       .getRepository(ContentPreferenceSource)
       .findOneBy({ userId: '1', referenceId: 's1' });
     expect(contentPreference!.flags.hideFeedPosts).toEqual(false);
@@ -3817,8 +4211,9 @@ describe('mutation collapsePinnedPosts', () => {
 
   it('should throw when user is not a member', async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).delete({
+    await con.getRepository(ContentPreferenceSource).delete({
       sourceId: 's1',
+      referenceId: 's1',
       userId: '1',
     });
     await testMutationErrorCode(
@@ -3833,13 +4228,16 @@ describe('mutation collapsePinnedPosts', () => {
 
   it('should throw when user is blocked', async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).update(
+    await con.getRepository(ContentPreferenceSource).update(
       {
         sourceId: 's1',
+        referenceId: 's1',
         userId: '1',
       },
       {
-        role: SourceMemberRoles.Blocked,
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
       },
     );
     await testMutationErrorCode(
@@ -3861,6 +4259,11 @@ describe('mutation collapsePinnedPosts', () => {
     expect(sourceMember).toBeTruthy();
     expect(sourceMember?.flags.collapsePinnedPosts).toEqual(undefined);
 
+    let contentPreference = await con
+      .getRepository(ContentPreferenceSource)
+      .findOneBy({ userId: '1', referenceId: 's1' });
+    expect(contentPreference!.flags.collapsePinnedPosts).toEqual(undefined);
+
     await client.mutate(MUTATION, { variables: { sourceId: 's1' } });
     sourceMember = await con.getRepository(SourceMember).findOneBy({
       sourceId: 's1',
@@ -3868,7 +4271,7 @@ describe('mutation collapsePinnedPosts', () => {
     });
     expect(sourceMember?.flags.collapsePinnedPosts).toEqual(true);
 
-    const contentPreference = await con
+    contentPreference = await con
       .getRepository(ContentPreferenceSource)
       .findOneBy({ userId: '1', referenceId: 's1' });
     expect(contentPreference!.flags.collapsePinnedPosts).toEqual(true);
@@ -3925,8 +4328,9 @@ describe('mutation expandPinnedPosts', () => {
 
   it('should throw when user is not a member', async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).delete({
+    await con.getRepository(ContentPreferenceSource).delete({
       sourceId: 's1',
+      referenceId: 's1',
       userId: '1',
     });
     await testMutationErrorCode(
@@ -3941,13 +4345,16 @@ describe('mutation expandPinnedPosts', () => {
 
   it('should throw when user is blocked', async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).update(
+    await con.getRepository(ContentPreferenceSource).update(
       {
         sourceId: 's1',
+        referenceId: 's1',
         userId: '1',
       },
       {
-        role: SourceMemberRoles.Blocked,
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Blocked,
+        }),
       },
     );
     await testMutationErrorCode(
@@ -3969,6 +4376,11 @@ describe('mutation expandPinnedPosts', () => {
     expect(sourceMember).toBeTruthy();
     expect(sourceMember?.flags.collapsePinnedPosts).toEqual(undefined);
 
+    let contentPreference = await con
+      .getRepository(ContentPreferenceSource)
+      .findOneBy({ userId: '1', referenceId: 's1' });
+    expect(contentPreference!.flags.collapsePinnedPosts).toEqual(undefined);
+
     await client.mutate(MUTATION, { variables: { sourceId: 's1' } });
     sourceMember = await con.getRepository(SourceMember).findOneBy({
       sourceId: 's1',
@@ -3976,7 +4388,7 @@ describe('mutation expandPinnedPosts', () => {
     });
     expect(sourceMember?.flags.collapsePinnedPosts).toEqual(false);
 
-    const contentPreference = await con
+    contentPreference = await con
       .getRepository(ContentPreferenceSource)
       .findOneBy({ userId: '1', referenceId: 's1' });
     expect(contentPreference!.flags.collapsePinnedPosts).toEqual(false);
@@ -3997,8 +4409,8 @@ describe('SourceMember flags field', () => {
 
   it('should return all the public flags for source member', async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).update(
-      { userId: '1', sourceId: 'a' },
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1', referenceId: 'a' },
       {
         flags: updateFlagsStatement({
           hideFeedPosts: true,

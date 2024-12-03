@@ -1,8 +1,8 @@
 import DataLoader, { BatchLoadFn } from 'dataloader';
 import { Context } from './Context';
 import { getShortUrl } from './common';
-import { SourceMember } from './entity';
 import { GQLSource } from './schema/sources';
+import { ContentPreferenceSource } from './entity/contentPreference/ContentPreferenceSource';
 
 export const defaultCacheKeyFn = <K extends object | string>(key: K) => {
   if (typeof key === 'object') {
@@ -83,13 +83,15 @@ export class DataLoaderService {
           let referralToken = source.currentMember?.referralToken;
 
           if (!referralToken) {
-            const sourceMember: Pick<SourceMember, 'referralToken'> | null =
-              await this.ctx.con.getRepository(SourceMember).findOne({
-                select: ['referralToken'],
-                where: { sourceId: source.id, userId },
-              });
+            const sourceMember: Pick<ContentPreferenceSource, 'flags'> | null =
+              await this.ctx.con
+                .getRepository(ContentPreferenceSource)
+                .findOne({
+                  select: ['flags'],
+                  where: { referenceId: source.id, userId },
+                });
 
-            referralToken = sourceMember?.referralToken;
+            referralToken = sourceMember?.flags.referralToken;
           }
 
           if (!referralToken) {

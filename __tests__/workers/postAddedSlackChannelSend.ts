@@ -2,9 +2,9 @@ import { expectSuccessfulTypedBackground, saveFixtures } from '../helpers';
 import { postAddedSlackChannelSendWorker as worker } from '../../src/workers/postAddedSlackChannelSend';
 import {
   ArticlePost,
+  Feed,
   Post,
   Source,
-  SourceMember,
   SourceType,
   SquadSource,
   User,
@@ -25,6 +25,8 @@ import { ChangeObject } from '../../src/types';
 import { SourceMemberRoles } from '../../src/roles';
 import { addSeconds } from 'date-fns';
 import { SlackApiErrorCode } from '../../src/errors';
+import { ContentPreferenceStatus } from '../../src/entity/contentPreference/types';
+import { ContentPreferenceSource } from '../../src/entity/contentPreference/ContentPreferenceSource';
 
 const conversationsJoin = jest.fn().mockResolvedValue({
   ok: true,
@@ -61,6 +63,11 @@ describe('postAddedSlackChannelSend worker', () => {
     await saveFixtures(con, Source, sourcesFixture);
     await saveFixtures(con, ArticlePost, postsFixture);
     await saveFixtures(con, User, usersFixture);
+    await saveFixtures(
+      con,
+      Feed,
+      usersFixture.map((u) => ({ id: u.id, userId: u.id })),
+    );
     await con.getRepository(SquadSource).save([
       {
         id: 'squadslackchannel',
@@ -73,20 +80,30 @@ describe('postAddedSlackChannelSend worker', () => {
       },
     ]);
     const createdAt = new Date();
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 'squadslackchannel',
+        referenceId: 'squadslackchannel',
         userId: '1',
-        role: SourceMemberRoles.Admin,
-        referralToken: 'squadslackchanneltoken2',
         createdAt: addSeconds(createdAt, 2),
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: 'squadslackchanneltoken2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
         sourceId: 'squadslackchannel',
+        referenceId: 'squadslackchannel',
         userId: '2',
-        role: SourceMemberRoles.Admin,
-        referralToken: 'squadslackchanneltoken1',
         createdAt: addSeconds(createdAt, 1),
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: 'squadslackchanneltoken1',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
       },
     ]);
     const [userIntegration] = await con.getRepository(UserIntegration).save([

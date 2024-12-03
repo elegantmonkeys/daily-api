@@ -20,7 +20,6 @@ import {
   PostType,
   SharePost,
   Source,
-  SourceMember,
   SourceType,
   User,
   UserPost,
@@ -1249,13 +1248,19 @@ describe('query sourceFeed', () => {
     loggedUser = '1';
     await con.getRepository(Source).update({ id: 'b' }, { private: true });
     await con.getRepository(User).save(usersFixture[0]);
-    await con.getRepository(SourceMember).save([
+    await saveFixtures(con, Feed, [{ id: '1', userId: '1' }]);
+    await con.getRepository(ContentPreferenceSource).save([
       {
-        userId: '1',
         sourceId: 'b',
-        role: SourceMemberRoles.Admin,
-        referralToken: randomUUID(),
+        referenceId: 'b',
+        userId: '1',
         createdAt: new Date(2022, 11, 19),
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: randomUUID(),
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
     ]);
     const res = await client.query(QUERY('b'));
@@ -1268,6 +1273,7 @@ describe('query sourceFeed', () => {
     loggedUser = '1';
     additionalProps = 'type image';
     await con.getRepository(User).save(usersFixture[0]);
+    await saveFixtures(con, Feed, [{ id: '1', userId: '1' }]);
     const repo = con.getRepository(Source);
     await repo.update({ id: 'b' }, { private: true });
     const source = await repo.findOneBy({ id: 'b' });
@@ -1282,13 +1288,18 @@ describe('query sourceFeed', () => {
     await con
       .getRepository(WelcomePost)
       .update({ id: welcome.id }, { image: null });
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
-        userId: '1',
         sourceId: 'b',
-        role: SourceMemberRoles.Admin,
-        referralToken: randomUUID(),
+        referenceId: 'b',
+        userId: '1',
         createdAt: new Date(2022, 11, 19),
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: randomUUID(),
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
     ]);
 
@@ -1308,14 +1319,20 @@ describe('query sourceFeed', () => {
   it('should disallow access to feed for public source for blocked members', async () => {
     loggedUser = '1';
     await con.getRepository(User).save(usersFixture[0]);
+    await saveFixtures(con, Feed, [{ id: '1', userId: '1' }]);
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad, private: false });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
+      referenceId: 'a',
       userId: '1',
-      referralToken: 'rt2',
-      role: SourceMemberRoles.Blocked,
+      flags: {
+        role: SourceMemberRoles.Blocked,
+        referralToken: 'rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
 
     return testQueryErrorCode(
@@ -2822,18 +2839,39 @@ describe('function feedToFilters', () => {
   it('should return filters with source memberships', async () => {
     loggedUser = '1';
     await saveFixtures(con, User, [usersFixture[0]]);
-    await con.getRepository(SourceMember).save([
+    await saveFixtures(
+      con,
+      Source,
+      sourcesFixture.map((item) => ({
+        ...item,
+        id: `${item.id}-sqvf`,
+        handle: `${item.handle}-sqvf`,
+        type: SourceType.Squad,
+      })),
+    );
+    await saveFixtures(con, Feed, [{ id: '1', userId: '1' }]);
+    await con.getRepository(ContentPreferenceSource).save([
       {
+        sourceId: 'a-sqvf',
+        referenceId: 'a-sqvf',
         userId: '1',
-        sourceId: 'a',
-        role: SourceMemberRoles.Member,
-        referralToken: 'rt',
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
+        sourceId: 'b-sqvf',
+        referenceId: 'b-sqvf',
         userId: '1',
-        sourceId: 'b',
-        role: SourceMemberRoles.Admin,
-        referralToken: 'rt2',
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: 'rt2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
     ]);
     expect(await feedToFilters(con, '1', '1')).toMatchSnapshot();
@@ -2908,14 +2946,19 @@ describe('function feedToFilters', () => {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad, private: true });
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
-        userId: '1',
         sourceId: 'a',
-        role: SourceMemberRoles.Member,
-        referralToken: 'rt2',
+        referenceId: 'a',
+        userId: '1',
         createdAt: new Date(2022, 11, 19),
-        flags: { hideFeedPosts: true },
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt2',
+          hideFeedPosts: true,
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
     ]);
     const filters = await feedToFilters(con, '1', '1');
@@ -2930,14 +2973,19 @@ describe('function feedToFilters', () => {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad, private: true });
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
-        userId: '1',
         sourceId: 'a',
-        role: SourceMemberRoles.Member,
-        referralToken: 'rt2',
+        referenceId: 'a',
+        userId: '1',
         createdAt: new Date(2022, 11, 19),
-        flags: { hideFeedPosts: false },
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt2',
+          hideFeedPosts: false,
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
     ]);
     const filters = await feedToFilters(con, '1', '1');
@@ -2951,14 +2999,18 @@ describe('function feedToFilters', () => {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad, private: true });
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
-        userId: '1',
         sourceId: 'a',
-        role: SourceMemberRoles.Member,
-        referralToken: 'rt2',
+        referenceId: 'a',
+        userId: '1',
         createdAt: new Date(2022, 11, 19),
-        flags: {},
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
     ]);
     const filters = await feedToFilters(con, '1', '1');

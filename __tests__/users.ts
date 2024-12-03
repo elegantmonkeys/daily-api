@@ -43,7 +43,6 @@ import {
   reputationReasonAmount,
   ReputationType,
   Source,
-  SourceMember,
   User,
   UserMarketingCta,
   UserPersonalizedDigest,
@@ -110,6 +109,7 @@ import { ContentPreferenceUser } from '../src/entity/contentPreference/ContentPr
 import { ContentPreferenceStatus } from '../src/entity/contentPreference/types';
 import { identifyUserPersonalizedDigest } from '../src/cio';
 import type { GQLUser } from '../src/schema/users';
+import { ContentPreferenceSource } from '../src/entity/contentPreference/ContentPreferenceSource';
 
 let con: DataSource;
 let app: FastifyInstance;
@@ -5439,11 +5439,17 @@ describe('mutation sendReport', () => {
     it('should report private source as a member', async () => {
       loggedUser = '1';
       await con.getRepository(Source).update({ id: 'a' }, { private: true });
-      await con.getRepository(SourceMember).save({
-        userId: loggedUser,
+      await saveFixtures(con, Feed, [{ id: loggedUser, userId: loggedUser }]);
+      await con.getRepository(ContentPreferenceSource).save({
         sourceId: 'a',
-        role: SourceMemberRoles.Member,
-        referralToken: 't1',
+        referenceId: 'a',
+        userId: loggedUser,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 't1',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: loggedUser,
       });
       const res = await client.mutate(MUTATION, { variables });
       expect(res.errors).toBeFalsy();

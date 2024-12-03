@@ -31,13 +31,14 @@ import {
   GQLSource,
   SourcePermissions,
 } from './sources';
-import { SourceMember, SourceType } from '../entity';
+import { SourceType } from '../entity';
 import { Connection, ConnectionArguments } from 'graphql-relay';
 import {
   GQLDatePageGeneratorConfig,
   queryPaginatedByDate,
 } from '../common/datePageGenerator';
 import { ConversationsInfoResponse } from '@slack/web-api';
+import { ContentPreferenceSource } from '../entity/contentPreference/ContentPreferenceSource';
 import { SourceMemberRoles } from '../roles';
 
 export type GQLSlackChannels = {
@@ -350,16 +351,18 @@ export const resolvers: IResolvers<unknown, BaseContext> = traceResolvers<
             },
           }),
           source.private && source.type === SourceType.Squad
-            ? ctx.con.getRepository(SourceMember).findOne({
-                select: ['referralToken'],
-                where: {
-                  sourceId: source.id,
+            ? ctx.con
+                .getRepository(ContentPreferenceSource)
+                .createQueryBuilder()
+                .select('flags')
+                .where('"referenceId" = :sourceId', {
+                  sourceId: args.sourceId,
+                })
+                .andWhere(`flags->>'role' = :role`, {
                   role: SourceMemberRoles.Admin,
-                },
-                order: {
-                  createdAt: 'ASC',
-                },
-              })
+                })
+                .orderBy('"createdAt"', 'ASC')
+                .getRawOne<Pick<ContentPreferenceSource, 'flags'>>()
             : null,
         ]);
       const user = await slackIntegration.user;
@@ -437,11 +440,11 @@ export const resolvers: IResolvers<unknown, BaseContext> = traceResolvers<
           'connected',
         );
 
-        if (sourceAdmin?.referralToken) {
+        if (sourceAdmin?.flags.referralToken) {
           squadLink = addPrivateSourceJoinParams({
             url: squadLink,
             source,
-            referralToken: sourceAdmin?.referralToken,
+            referralToken: sourceAdmin?.flags.referralToken,
           });
         }
 

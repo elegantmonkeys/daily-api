@@ -1,4 +1,5 @@
-import { Source, SourceMember, SourceType, UserActionType } from '../entity';
+import { Source, SourceType, UserActionType } from '../entity';
+import { ContentPreferenceSource } from '../entity/contentPreference/ContentPreferenceSource';
 import { SourceMemberRoles } from '../roles';
 import { insertOrIgnoreAction } from '../schema/actions';
 import { ChangeObject } from '../types';
@@ -19,16 +20,14 @@ const worker: Worker = {
       return;
     }
 
-    const owner = await con.getRepository(SourceMember).findOne({
-      select: ['userId'],
-      where: {
-        sourceId: source.id,
-        role: SourceMemberRoles.Admin,
-      },
-      order: {
-        createdAt: 'ASC',
-      },
-    });
+    const owner = await con
+      .getRepository(ContentPreferenceSource)
+      .createQueryBuilder()
+      .select('"userId"')
+      .where('"referenceId" = :sourceId', { sourceId: source.id })
+      .andWhere(`flags->>'role' = :role`, { role: SourceMemberRoles.Admin })
+      .orderBy('"createdAt"', 'ASC')
+      .getRawOne<Pick<ContentPreferenceSource, 'userId'>>();
 
     if (!owner) {
       return;

@@ -3,7 +3,6 @@ import { GraphORM, GraphORMField, QueryBuilder } from './graphorm';
 import {
   Bookmark,
   Source,
-  SourceMember,
   User,
   UserPost,
   UserNotification,
@@ -455,8 +454,8 @@ const obj = new GraphORM({
           sort: 'createdAt',
           customRelation: (ctx, parentAlias, childAlias, qb): QueryBuilder =>
             qb
-              .where(`${childAlias}."sourceId" = "${parentAlias}".id`)
-              .andWhere(`${childAlias}."role" != :role`, {
+              .where(`${childAlias}."referenceId" = "${parentAlias}".id`)
+              .andWhere(`${childAlias}.flags->>'role' != :role`, {
                 role: SourceMemberRoles.Blocked,
               }),
         },
@@ -479,7 +478,7 @@ const obj = new GraphORM({
           customRelation: (ctx, parentAlias, childAlias, qb): QueryBuilder =>
             qb
               .where(`${childAlias}."userId" = :userId`, { userId: ctx.userId })
-              .andWhere(`${childAlias}."sourceId" = "${parentAlias}".id`),
+              .andWhere(`${childAlias}."referenceId" = "${parentAlias}".id`),
         },
       },
       privilegedMembers: {
@@ -487,8 +486,8 @@ const obj = new GraphORM({
           isMany: true,
           customRelation: (ctx, parentAlias, childAlias, qb): QueryBuilder => {
             return qb
-              .where(`${childAlias}."sourceId" = "${parentAlias}".id`)
-              .andWhere(`${childAlias}.role IN (:...roles)`, {
+              .where(`${childAlias}."referenceId" = "${parentAlias}".id`)
+              .andWhere(`${childAlias}.flags->>'role' IN (:...roles)`, {
                 roles: [SourceMemberRoles.Admin, SourceMemberRoles.Moderator],
               })
               .limit(50); // limit to avoid huge arrays for members, most sources should fit into this see PR !1219 for more info
@@ -509,18 +508,21 @@ const obj = new GraphORM({
     },
   },
   SourceMember: {
-    requiredColumns: ['createdAt', 'userId', 'role'],
+    from: 'ContentPreference',
+    additionalQuery: (ctx, alias, qb) =>
+      qb.andWhere(`"${alias}"."type" = '${ContentPreferenceType.Source}'`),
+    requiredColumns: ['createdAt', 'userId', 'flags'],
     fields: {
       permissions: {
         select: (ctx: Context, alias: string, qb: QueryBuilder): string => {
           const query = qb
             .select('array["memberPostingRank", "memberInviteRank"]')
             .from(Source, 'postingSquad')
-            .where(`postingSquad.id = ${alias}."sourceId"`);
+            .where(`postingSquad.id = ${alias}."referenceId"`);
           return `${query.getQuery()}`;
         },
         transform: (value: [number, number], ctx: Context, parent) => {
-          const member = parent as SourceMember;
+          const member = parent as ContentPreferenceSource;
 
           if (!ctx.userId || member.userId !== ctx.userId) {
             return null;
@@ -536,22 +538,34 @@ const obj = new GraphORM({
       },
       roleRank: {
         rawSelect: true,
-        select: `
+        select: (ctx, alias) => {
+          return `
             (CASE
               ${sourceRoleRankKeys
                 .map(
                   (role) =>
-                    `WHEN "role" = '${role}' THEN ${sourceRoleRank[role as keyof typeof sourceRoleRank]}`,
+                    `WHEN ${alias}.flags->>'role' = '${role}' THEN ${sourceRoleRank[role as keyof typeof sourceRoleRank]}`,
                 )
                 .join(' ')}
             ELSE 0 END)
-          `,
+          `;
+        },
       },
       referralToken: {
+        rawSelect: true,
+        select: (ctx, alias) => {
+          return `${alias}.flags->>'referralToken'`;
+        },
         transform: (value: string, ctx: Context, parent) => {
-          const member = parent as SourceMember;
+          const member = parent as ContentPreferenceSource;
 
           return nullIfNotSameUser(value, ctx, { id: member.userId });
+        },
+      },
+      role: {
+        rawSelect: true,
+        select: (ctx, alias) => {
+          return `COALESCE(${alias}.flags->>'role', '${SourceMemberRoles.Member}')`;
         },
       },
       flags: {

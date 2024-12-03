@@ -2,7 +2,10 @@ import { ghostUser } from '../common';
 import { TypedWorker } from './worker';
 import { addNewSourceMember, removeSourceMember } from '../schema/sources';
 import { SourceMemberRoles } from '../roles';
-import { SourceMember, User } from '../entity';
+import { User } from '../entity';
+import { ContentPreferenceSource } from '../entity/contentPreference/ContentPreferenceSource';
+import { Not } from 'typeorm';
+import { ContentPreferenceStatus } from '../entity/contentPreference/types';
 
 const PLUS_MEMBER_SQUAD_ID = '05862288-bace-4723-9218-d30fab6ae96d';
 const worker: TypedWorker<'user-updated'> = {
@@ -37,10 +40,11 @@ const worker: TypedWorker<'user-updated'> = {
       log.info({ userId: user.id }, 'removed user from plus member squad');
     } else {
       // Started being plus member add them
-      const check = await con.getRepository(SourceMember).findOne({
+      const check = await con.getRepository(ContentPreferenceSource).findOne({
         where: {
           userId: user.id,
-          sourceId: PLUS_MEMBER_SQUAD_ID,
+          referenceId: PLUS_MEMBER_SQUAD_ID,
+          status: Not(ContentPreferenceStatus.Blocked),
         },
       });
       if (check) {

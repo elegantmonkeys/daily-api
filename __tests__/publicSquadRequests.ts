@@ -11,8 +11,8 @@ import {
 } from './helpers';
 import { Roles, SourceMemberRoles } from '../src/roles';
 import {
+  Feed,
   Source,
-  SourceMember,
   SquadPublicRequest,
   SquadPublicRequestStatus,
   User,
@@ -21,6 +21,8 @@ import { sourcesFixture } from './fixture/source';
 import { usersFixture } from './fixture/user';
 import { DataSource } from 'typeorm';
 import createOrGetConnection from '../src/db';
+import { ContentPreferenceStatus } from '../src/entity/contentPreference/types';
+import { ContentPreferenceSource } from '../src/entity/contentPreference/ContentPreferenceSource';
 
 let con: DataSource;
 let state: GraphQLTestingState;
@@ -52,27 +54,47 @@ beforeEach(async () => {
   roles = [];
   await saveFixtures(con, Source, [sourcesFixture[5]]);
   await saveFixtures(con, User, usersFixture);
-  await con.getRepository(SourceMember).save([
+  await saveFixtures(
+    con,
+    Feed,
+    usersFixture.map((u) => ({ id: u.id, userId: u.id })),
+  );
+  await con.getRepository(ContentPreferenceSource).save([
     {
+      sourceId,
+      referenceId: sourceId,
       userId: '1',
-      sourceId,
-      role: SourceMemberRoles.Admin,
-      referralToken: 'rt1',
       createdAt: new Date(2022, 11, 19),
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: 'rt1',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     },
     {
+      sourceId,
+      referenceId: sourceId,
       userId: '2',
-      sourceId,
-      role: SourceMemberRoles.Moderator,
-      referralToken: 'rt2',
       createdAt: new Date(2022, 11, 20),
+      flags: {
+        role: SourceMemberRoles.Moderator,
+        referralToken: 'rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '2',
     },
     {
-      userId: '3',
       sourceId,
-      role: SourceMemberRoles.Member,
-      referralToken: 'rt3',
+      referenceId: sourceId,
+      userId: '3',
       createdAt: new Date(2022, 11, 19),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'rt3',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '3',
     },
   ]);
 

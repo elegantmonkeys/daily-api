@@ -40,8 +40,8 @@ Object {
   "excludeTypes": Array [],
   "includeTags": Array [],
   "sourceIds": Array [
-    "a",
-    "b",
+    "a-sqvf",
+    "b-sqvf",
   ],
 }
 `;

@@ -4,19 +4,18 @@ import { NotificationWorker } from './worker';
 import { ChangeObject } from '../../types';
 import {
   Source,
-  SourceMember,
   SourceType,
   User,
   UserActionType,
   WelcomePost,
 } from '../../entity';
-import { In, Not } from 'typeorm';
 import { SourceMemberRoles } from '../../roles';
 import { insertOrIgnoreAction } from '../../schema/actions';
 import { getSubscribedMembers } from './utils';
+import { ContentPreferenceSource } from '../../entity/contentPreference/ContentPreferenceSource';
 
 interface Data {
-  sourceMember: ChangeObject<SourceMember>;
+  sourceMember: ChangeObject<ContentPreferenceSource>;
 }
 
 const worker: NotificationWorker = {
@@ -28,11 +27,17 @@ const worker: NotificationWorker = {
       con,
       NotificationType.SquadMemberJoined,
       member.sourceId,
-      {
-        sourceId: member.sourceId,
-        userId: Not(In([member.userId])),
-        role: SourceMemberRoles.Admin,
-      },
+      (qb) =>
+        qb
+          .andWhere(`${qb.alias}."userId" NOT IN (:...users)`, {
+            users: [member.userId],
+          })
+          .andWhere(`${qb.alias}."referenceId" = :sourceId`, {
+            sourceId: member.sourceId,
+          })
+          .andWhere(` ${qb.alias}.flags->>'role' = :role`, {
+            role: SourceMemberRoles.Admin,
+          }),
     );
 
     const doneBy = await con
@@ -45,7 +50,7 @@ const worker: NotificationWorker = {
       return;
     }
 
-    if (member.role !== SourceMemberRoles.Admin) {
+    if (member.flags.role !== SourceMemberRoles.Admin) {
       await insertOrIgnoreAction(con, member.userId, UserActionType.JoinSquad);
     }
 

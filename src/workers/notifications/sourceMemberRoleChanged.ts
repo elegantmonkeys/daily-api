@@ -2,13 +2,14 @@ import { messageToJson } from '../worker';
 import { NotificationSourceContext } from '../../notifications';
 import { NotificationWorker } from './worker';
 import { ChangeObject } from '../../types';
-import { Source, SourceMember } from '../../entity';
+import { Source } from '../../entity';
 import { SourceMemberRoles } from '../../roles';
 import { NotificationType } from '../../notifications/common';
+import { ContentPreferenceSource } from '../../entity/contentPreference/ContentPreferenceSource';
 
 interface Data {
   previousRole: SourceMemberRoles;
-  sourceMember: ChangeObject<SourceMember>;
+  sourceMember: ChangeObject<ContentPreferenceSource>;
 }
 
 const previousRoleToNewRole: Partial<
@@ -55,8 +56,9 @@ const worker: NotificationWorker = {
       source,
     };
 
-    const roleToNotificationMap =
-      previousRoleToNewRole[previousRole]?.[member.role];
+    const roleToNotificationMap = member.flags.role
+      ? previousRoleToNewRole[previousRole]?.[member.flags.role]
+      : undefined;
 
     switch (roleToNotificationMap) {
       case 'demoted_to_member':

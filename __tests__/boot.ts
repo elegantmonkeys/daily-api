@@ -25,7 +25,6 @@ import {
   Settings,
   SETTINGS_DEFAULT,
   Source,
-  SourceMember,
   SourceType,
   SQUAD_IMAGE_PLACEHOLDER,
   SquadSource,
@@ -63,6 +62,8 @@ import { DEFAULT_TIMEZONE, submitArticleThreshold } from '../src/common';
 import { saveReturnAlerts } from '../src/schema/alerts';
 import { UserVote } from '../src/types';
 import { BootAlerts, excludeProperties } from '../src/routes/boot';
+import { ContentPreferenceSource } from '../src/entity/contentPreference/ContentPreferenceSource';
+import { ContentPreferenceStatus } from '../src/entity/contentPreference/types';
 
 let app: FastifyInstance;
 let con: DataSource;
@@ -155,12 +156,19 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  const users = usersFixture.slice(0, 1);
+
   jest.resetAllMocks();
   jest.mocked(getEncryptedFeatures).mockReturnValue('enc');
-  await con.getRepository(User).save(usersFixture[0]);
+  await con.getRepository(User).save(users);
   await con.getRepository(Source).save(sourcesFixture);
   await con.getRepository(Post).save(postsFixture);
   await ioRedisPool.execute((client) => client.flushall());
+  await saveFixtures(
+    con,
+    Feed,
+    users.map((u) => ({ id: u.id, userId: u.id })),
+  );
 });
 
 const BASE_PATH = '/boot';
@@ -884,30 +892,50 @@ describe('boot misc', () => {
         active: false,
       },
     ]);
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 's1',
+        referenceId: 's1',
         userId: '1',
-        referralToken: 'rt',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
         sourceId: 's2',
+        referenceId: 's2',
         userId: '1',
-        referralToken: 'rt2',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
         sourceId: 's4',
+        referenceId: 's4',
         userId: '1',
-        referralToken: 'rt3',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt3',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
         sourceId: 's5',
+        referenceId: 's5',
         userId: '1',
-        referralToken: 'rt5',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt5',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
     ]);
     const res = await request(app.server)
@@ -987,18 +1015,28 @@ describe('boot misc', () => {
         active: false,
       },
     ]);
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 's1',
+        referenceId: 's1',
         userId: '1',
-        referralToken: 'rt',
-        role: SourceMemberRoles.Member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
         sourceId: 's3',
+        referenceId: 's3',
         userId: '1',
-        referralToken: 'rt3',
-        role: SourceMemberRoles.Blocked,
+        flags: {
+          role: SourceMemberRoles.Blocked,
+          referralToken: 'rt3',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
     ]);
     const res = await request(app.server)

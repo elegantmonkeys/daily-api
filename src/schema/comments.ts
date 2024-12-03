@@ -15,7 +15,6 @@ import {
   CommentMention,
   Post,
   Source,
-  SourceMember,
   SourceType,
   User,
   PostType,
@@ -52,6 +51,8 @@ import {
 import { reportComment } from '../common/reporting';
 import { ReportReason } from '../entity/common';
 import { toGQLEnum } from '../common/utils';
+import { ContentPreferenceSource } from '../entity/contentPreference/ContentPreferenceSource';
+import { ContentPreferenceStatus } from '../entity/contentPreference/types';
 
 export interface GQLComment {
   id: string;
@@ -481,8 +482,13 @@ export const getMentions = async (
   return repo
     .createQueryBuilder('u')
     .select('u.id, u.username')
-    .innerJoin(SourceMember, 'sm', 'u.id = sm."userId"')
-    .where('sm."sourceId" = :sourceId', { sourceId })
+    .innerJoin(
+      ContentPreferenceSource,
+      'cps',
+      'u.id = cps."userId" AND cps.status != :status',
+      { status: ContentPreferenceStatus.Blocked },
+    )
+    .where('cps."referenceId" = :sourceId', { sourceId })
     .andWhere('u.username IN (:...usernames)', { usernames: result })
     .andWhere('u.id != :id', { id: userId })
     .getRawMany();

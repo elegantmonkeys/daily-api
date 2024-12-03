@@ -14,7 +14,7 @@ import {
   MarketingCta,
   Settings,
   SETTINGS_DEFAULT,
-  SourceMember,
+  SourceType,
   SquadSource,
   User,
 } from '../entity';
@@ -63,6 +63,11 @@ import { maxFeedsPerUser } from '../types';
 import { queryReadReplica } from '../common/queryReadReplica';
 import { queryDataSource } from '../common/queryDataSource';
 import { isPlusMember } from '../paddle';
+import {
+  ContentPreferenceSource,
+  ContentPreferenceSourceFlags,
+} from '../entity/contentPreference/ContentPreferenceSource';
+import { ContentPreferenceStatus } from '../entity/contentPreference/types';
 
 export type BootSquadSource = Omit<GQLSource, 'currentMember'> & {
   permalink: string;
@@ -180,33 +185,44 @@ const getSquads = async (
     const sources = await con.manager
       .createQueryBuilder()
       .select('id')
-      .addSelect('type')
+      .addSelect('s.type', 'type')
       .addSelect('name')
       .addSelect('handle')
       .addSelect('image')
       .addSelect('NOT private', 'public')
       .addSelect('active')
-      .addSelect('role')
+      .addSelect('cps.flags', 'flags')
       .addSelect('"moderationRequired"')
       .addSelect('"memberPostingRank"')
-      .from(SourceMember, 'sm')
+      .from(ContentPreferenceSource, 'cps')
       .innerJoin(
         SquadSource,
         's',
-        'sm."sourceId" = s."id" and s."type" = \'squad\'',
+        'cps."referenceId" = s."id" and s."type" = :sourceType',
+        {
+          sourceType: SourceType.Squad,
+        },
       )
-      .where('sm."userId" = :userId', { userId })
-      .andWhere('sm."role" != :role', { role: SourceMemberRoles.Blocked })
+      .where('cps."userId" = :userId', { userId })
+      .andWhere(`cps.flags->>'role' != :role`, {
+        role: SourceMemberRoles.Blocked,
+      })
+      .andWhere(`cps.status != :status`, {
+        status: ContentPreferenceStatus.Blocked,
+      })
       .orderBy('LOWER(s.name)', 'ASC')
       .getRawMany<
-        GQLSource & { role: SourceMemberRoles; memberPostingRank: number }
+        GQLSource & {
+          flags: ContentPreferenceSourceFlags;
+          memberPostingRank: number;
+        }
       >();
 
     return sources.map((source) => {
-      const { role, memberPostingRank, image, ...restSource } = source;
+      const { flags, memberPostingRank, image, ...restSource } = source;
 
       const permissions = getPermissionsForMember(
-        { role },
+        { flags },
         { memberPostingRank },
       );
       // we only send posting and moderation permissions from boot to keep the payload small

@@ -1,15 +1,16 @@
 import { UserSourceIntegrationSlack } from '../entity/UserSourceIntegration';
 import { TypedWorker } from './worker';
 import fastq from 'fastq';
-import { Post, SourceMember, SourceType } from '../entity';
+import { Post, SourceType } from '../entity';
 import {
   getAttachmentForPostType,
   getSlackClient,
 } from '../common/userIntegration';
 import { addNotificationUtm, addPrivateSourceJoinParams } from '../common';
-import { SourceMemberRoles } from '../roles';
 import { SlackApiError, SlackApiErrorCode } from '../errors';
 import { counters } from '../telemetry/metrics';
+import { ContentPreferenceSource } from '../entity/contentPreference/ContentPreferenceSource';
+import { SourceMemberRoles } from '../roles';
 
 const sendQueueConcurrency = 10;
 
@@ -61,24 +62,22 @@ export const postAddedSlackChannelSendWorker: TypedWorker<'api.v1.post-visible'>
         );
 
         if (source.private && source.type === SourceType.Squad) {
-          const admin: Pick<SourceMember, 'referralToken'> | null = await con
-            .getRepository(SourceMember)
-            .findOne({
-              select: ['referralToken'],
-              where: {
-                sourceId: source.id,
-                role: SourceMemberRoles.Admin,
-              },
-              order: {
-                createdAt: 'ASC',
-              },
-            });
+          const admin = await con
+            .getRepository(ContentPreferenceSource)
+            .createQueryBuilder()
+            .addSelect('flags')
+            .where('"referenceId" = :sourceId', { sourceId: source.id })
+            .andWhere(`flags->>'role' = :role`, {
+              role: SourceMemberRoles.Admin,
+            })
+            .orderBy('"createdAt"', 'ASC')
+            .getRawOne<Pick<ContentPreferenceSource, 'flags'>>();
 
-          if (admin?.referralToken) {
+          if (admin?.flags.referralToken) {
             postLink = addPrivateSourceJoinParams({
               url: postLink,
               source,
-              referralToken: admin.referralToken,
+              referralToken: admin.flags.referralToken,
             });
           }
         }

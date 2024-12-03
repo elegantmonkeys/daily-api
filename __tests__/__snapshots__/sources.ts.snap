@@ -341,3 +341,30 @@ Object {
   },
 }
 `;
+
+exports[`query sourceMembers should return source members of source without members that blocked squad 1`] = `
+Object {
+  "sourceMembers": Object {
+    "edges": Array [
+      Object {
+        "node": Object {
+          "role": "admin",
+          "roleRank": 10,
+          "source": Object {
+            "id": "a",
+          },
+          "user": Object {
+            "id": "1",
+            "name": "Ido",
+            "username": "idoshamun",
+          },
+        },
+      },
+    ],
+    "pageInfo": Object {
+      "endCursor": "YXJyYXljb25uZWN0aW9uOjA=",
+      "hasNextPage": false,
+    },
+  },
+}
+`;

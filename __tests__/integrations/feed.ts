@@ -22,7 +22,7 @@ import {
   PostType,
   postTypes,
   Source,
-  SourceMember,
+  SourceType,
   User,
 } from '../../src/entity';
 import { SourceMemberRoles } from '../../src/roles';
@@ -141,6 +141,16 @@ describe('FeedClient', () => {
 describe('FeedPreferencesConfigGenerator', () => {
   beforeEach(async () => {
     await saveFixtures(con, Source, sourcesFixture);
+    await saveFixtures(
+      con,
+      Source,
+      sourcesFixture.map((item) => ({
+        ...item,
+        id: `${item.id}-lofnpr`,
+        handle: `${item.handle}-lofnpr`,
+        type: SourceType.Squad,
+      })),
+    );
     await saveFixtures(con, Keyword, [
       {
         value: 'javascript',
@@ -219,19 +229,27 @@ describe('FeedPreferencesConfigGenerator', () => {
         status: ContentPreferenceStatus.Blocked,
         referenceId: 'b',
       },
-    ]);
-    await con.getRepository(SourceMember).save([
       {
+        sourceId: 'a-lofnpr',
+        referenceId: 'a-lofnpr',
         userId: '1',
-        sourceId: 'a',
-        role: SourceMemberRoles.Member,
-        referralToken: 'rt',
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
+        sourceId: 'b-lofnpr',
+        referenceId: 'b-lofnpr',
         userId: '1',
-        sourceId: 'b',
-        role: SourceMemberRoles.Admin,
-        referralToken: 'rt2',
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
     ]);
     await con.getRepository(AdvancedSettings).save([
@@ -294,7 +312,7 @@ describe('FeedPreferencesConfigGenerator', () => {
         fresh_page_size: '1',
         offset: 3,
         page_size: 2,
-        squad_ids: expect.arrayContaining(['a', 'b']),
+        squad_ids: expect.arrayContaining(['a-lofnpr', 'b-lofnpr']),
         total_pages: 20,
         user_id: '1',
       },
@@ -524,6 +542,16 @@ describe('FeedUserStateConfigGenerator', () => {
 describe('FeedLofnConfigGenerator', () => {
   beforeEach(async () => {
     await saveFixtures(con, Source, sourcesFixture);
+    await saveFixtures(
+      con,
+      Source,
+      sourcesFixture.map((item) => ({
+        ...item,
+        id: `${item.id}-lofncg`,
+        handle: `${item.handle}-lofncg`,
+        type: SourceType.Squad,
+      })),
+    );
     await con.getRepository(Feed).save({ id: '1', userId: 'u1' });
     await saveFixtures(con, Keyword, [
       {
@@ -602,19 +630,27 @@ describe('FeedLofnConfigGenerator', () => {
         status: ContentPreferenceStatus.Blocked,
         referenceId: 'b',
       },
-    ]);
-    await con.getRepository(SourceMember).save([
       {
+        sourceId: 'a-lofncg',
+        referenceId: 'a-lofncg',
         userId: '1',
-        sourceId: 'a',
-        role: SourceMemberRoles.Member,
-        referralToken: 'rt',
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
+        sourceId: 'b-lofncg',
+        referenceId: 'b-lofncg',
         userId: '1',
-        sourceId: 'b',
-        role: SourceMemberRoles.Admin,
-        referralToken: 'rt2',
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'rt2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
     ]);
     await con.getRepository(AdvancedSettings).save([
@@ -692,7 +728,7 @@ describe('FeedLofnConfigGenerator', () => {
         blocked_tags: expect.arrayContaining(['python', 'java']),
         blocked_title_words: expect.arrayContaining(['word-abc', 'word-def']),
         blocked_sources: expect.arrayContaining(['a', 'b']),
-        squad_ids: expect.arrayContaining(['a', 'b']),
+        squad_ids: expect.arrayContaining(['a-lofncg', 'b-lofncg']),
         allowed_post_types: expect.arrayContaining([
           'article',
           'share',

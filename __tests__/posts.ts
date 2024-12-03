@@ -15,6 +15,7 @@ import {
   Bookmark,
   BookmarkList,
   Comment,
+  Feed,
   FreeformPost,
   Post,
   PostMention,
@@ -26,7 +27,6 @@ import {
   PostType,
   SharePost,
   Source,
-  SourceMember,
   SourceType,
   SquadSource,
   UNKNOWN_SOURCE,
@@ -81,6 +81,8 @@ import {
 } from '../src/entity/SourcePostModeration';
 import { generateUUID } from '../src/ids';
 import { GQLResponse } from 'mercurius-integration-testing';
+import { ContentPreferenceSource } from '../src/entity/contentPreference/ContentPreferenceSource';
+import { ContentPreferenceStatus } from '../src/entity/contentPreference/types';
 
 jest.mock('../src/common/pubsub', () => ({
   ...(jest.requireActual('../src/common/pubsub') as Record<string, unknown>),
@@ -115,6 +117,11 @@ beforeEach(async () => {
   await saveFixtures(con, YouTubePost, videoPostsFixture);
   await saveFixtures(con, PostTag, postTagsFixture);
   await saveFixtures(con, User, badUsersFixture);
+  await saveFixtures(
+    con,
+    Feed,
+    badUsersFixture.map((u) => ({ id: u.id, userId: u.id })),
+  );
   await con
     .getRepository(User)
     .save({ id: '1', name: 'Ido', image: 'https://daily.dev/ido.jpg' });
@@ -142,6 +149,13 @@ beforeEach(async () => {
       name: 'Joanna Deer',
     },
   ]);
+  await saveFixtures(con, Feed, [
+    { id: '1', userId: '1' },
+    { id: '2', userId: '2' },
+    { id: '3', userId: '3' },
+    { id: '4', userId: '4' },
+    { id: '5', userId: '5' },
+  ]);
   await con.getRepository(SquadSource).save({
     id: 'm',
     name: 'Moderated Squad',
@@ -154,24 +168,39 @@ beforeEach(async () => {
     memberPostingRank: sourceRoleRank[SourceMemberRoles.Member],
     memberInviteRank: sourceRoleRank[SourceMemberRoles.Member],
   });
-  await con.getRepository(SourceMember).save([
+  await con.getRepository(ContentPreferenceSource).save([
     {
+      sourceId: 'm',
+      referenceId: 'm',
       userId: '3',
-      sourceId: 'm',
-      role: SourceMemberRoles.Moderator,
-      referralToken: randomUUID(),
+      flags: {
+        role: SourceMemberRoles.Moderator,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '3',
     },
     {
+      sourceId: 'm',
+      referenceId: 'm',
       userId: '4',
-      sourceId: 'm',
-      role: SourceMemberRoles.Member,
-      referralToken: randomUUID(),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '4',
     },
     {
-      userId: '5',
       sourceId: 'm',
-      role: SourceMemberRoles.Member,
-      referralToken: randomUUID(),
+      referenceId: 'm',
+      userId: '5',
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '5',
     },
   ]);
   await deleteKeysByPattern(`${rateLimiterName}:*`);
@@ -188,26 +217,41 @@ const saveSquadFixtures = async () => {
       { id: 'p1' },
       { type: PostType.Welcome, title: 'Welcome post', authorId: '1' },
     );
-  await con.getRepository(SourceMember).save([
+  await con.getRepository(ContentPreferenceSource).save([
     {
-      userId: '1',
       sourceId: 'a',
-      role: SourceMemberRoles.Member,
-      referralToken: randomUUID(),
+      referenceId: 'a',
+      userId: '1',
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     },
     {
-      userId: '2',
       sourceId: 'a',
-      role: SourceMemberRoles.Member,
-      referralToken: randomUUID(),
+      referenceId: 'a',
+      userId: '2',
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '2',
     },
   ]);
-  await con.getRepository(SourceMember).save(
+  await con.getRepository(ContentPreferenceSource).save(
     badUsersFixture.map((user) => ({
-      userId: user.id,
       sourceId: 'a',
-      role: SourceMemberRoles.Member,
-      referralToken: randomUUID(),
+      referenceId: 'a',
+      userId: user.id,
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: user.id,
     })),
   );
 };
@@ -1006,11 +1050,16 @@ describe('query post', () => {
   it('should throw error when annonymous user tries to access post from source with members', async () => {
     await con.getRepository(Source).update({ id: 'a' }, { private: true });
     await con.getRepository(Post).update({ id: 'p1' }, { private: true });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
+      referenceId: 'a',
       userId: '1',
-      referralToken: 'rt2',
-      role: SourceMemberRoles.Admin,
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: 'rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     return testQueryErrorCode(
       client,
@@ -1025,11 +1074,16 @@ describe('query post', () => {
     loggedUser = '2';
     await con.getRepository(Source).update({ id: 'a' }, { private: true });
     await con.getRepository(Post).update({ id: 'p1' }, { private: true });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
+      referenceId: 'a',
       userId: '1',
-      referralToken: 'rt2',
-      role: SourceMemberRoles.Admin,
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: 'rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     return testQueryErrorCode(
       client,
@@ -1053,11 +1107,16 @@ describe('query post', () => {
     await con
       .getRepository(Post)
       .update({ id: 'p1' }, { private: false, sourceId: 'a' });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
+      referenceId: 'a',
       userId: '1',
-      referralToken: 'rt2',
-      role: SourceMemberRoles.Blocked,
+      flags: {
+        role: SourceMemberRoles.Blocked,
+        referralToken: 'rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
 
     return testQueryErrorCode(
@@ -1442,23 +1501,34 @@ describe('mutation deletePost', () => {
 
   const createSharedPost = async (
     id = 'sp1',
-    member: Partial<SourceMember> = {},
+    member: Partial<ContentPreferenceSource> = {},
     authorId = '2',
   ) => {
     const post = await con.getRepository(Post).findOneBy({ id: 'p1' });
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
-        userId: '1',
         sourceId: 'a',
-        role: SourceMemberRoles.Member,
-        referralToken: randomUUID(),
+        referenceId: 'a',
+        userId: '1',
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: randomUUID(),
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
-        userId: '2',
         sourceId: 'a',
-        role: SourceMemberRoles.Member,
-        referralToken: randomUUID(),
+        referenceId: 'a',
+        userId: '2',
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
         ...member,
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: randomUUID(),
+          ...member.flags,
+        },
       },
     ]);
     await con.getRepository(SharePost).save({
@@ -1497,7 +1567,11 @@ describe('mutation deletePost', () => {
   it('should restrict member deleting a post from a moderator', async () => {
     loggedUser = '1';
     const id = 'sp1';
-    await createSharedPost(id, { role: SourceMemberRoles.Moderator });
+    await createSharedPost(id, {
+      flags: {
+        role: SourceMemberRoles.Moderator,
+      },
+    });
 
     return testMutationErrorCode(
       client,
@@ -1509,7 +1583,11 @@ describe('mutation deletePost', () => {
   it('should restrict member deleting a post from the admin', async () => {
     loggedUser = '1';
     const id = 'sp1';
-    await createSharedPost(id, { role: SourceMemberRoles.Admin });
+    await createSharedPost(id, {
+      flags: {
+        role: SourceMemberRoles.Admin,
+      },
+    });
 
     return testMutationErrorCode(
       client,
@@ -1558,21 +1636,28 @@ describe('mutation deletePost', () => {
 
   it('should delete the welcome post by a moderator or an admin', async () => {
     loggedUser = '2';
-    await con.getRepository(SourceMember).save({
-      userId: '1',
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
-      role: SourceMemberRoles.Moderator,
-      referralToken: randomUUID(),
+      referenceId: 'a',
+      userId: '1',
+      flags: {
+        role: SourceMemberRoles.Moderator,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     const source = await con.getRepository(Source).findOneBy({ id: 'a' });
     const post = await createSquadWelcomePost(con, source, '2');
     await verifyPostDeleted(post.id, loggedUser);
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '1', sourceId: 'a' },
-        { role: SourceMemberRoles.Admin },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
+      },
+    );
     const welcome = await createSquadWelcomePost(con, source, '2');
     await con
       .getRepository(Post)
@@ -1583,17 +1668,34 @@ describe('mutation deletePost', () => {
   it('should delete the shared post from a member as a moderator', async () => {
     loggedUser = '2';
     const id = 'sp1';
-    await createSharedPost(id, { role: SourceMemberRoles.Moderator }, '1');
+    await createSharedPost(
+      id,
+      {
+        flags: {
+          role: SourceMemberRoles.Moderator,
+        },
+      },
+      '1',
+    );
     await verifyPostDeleted(id, loggedUser);
   });
 
   it('should allow moderator deleting a post from other moderators', async () => {
     loggedUser = '1';
     const id = 'sp1';
-    await createSharedPost(id, { role: SourceMemberRoles.Moderator });
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Moderator });
+    await createSharedPost(id, {
+      flags: {
+        role: SourceMemberRoles.Moderator,
+      },
+    });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
 
     await verifyPostDeleted(id, loggedUser);
   });
@@ -1601,10 +1703,19 @@ describe('mutation deletePost', () => {
   it('should allow moderator deleting a post from the admin', async () => {
     loggedUser = '1';
     const id = 'sp1';
-    await createSharedPost(id, { role: SourceMemberRoles.Admin });
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Moderator });
+    await createSharedPost(id, {
+      flags: {
+        role: SourceMemberRoles.Admin,
+      },
+    });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
 
     await verifyPostDeleted(id, loggedUser);
   });
@@ -1612,7 +1723,15 @@ describe('mutation deletePost', () => {
   it('should delete the shared post as an admin of the squad', async () => {
     loggedUser = '2';
     const id = 'sp1';
-    await createSharedPost(id, { role: SourceMemberRoles.Admin }, '1');
+    await createSharedPost(
+      id,
+      {
+        flags: {
+          role: SourceMemberRoles.Admin,
+        },
+      },
+      '1',
+    );
     await verifyPostDeleted(id, loggedUser);
   });
 });
@@ -1884,11 +2003,16 @@ describe('mutation sharePost', () => {
       private: false,
       memberPostingRank: 0,
     });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 's1',
+      referenceId: 's1',
       userId: '1',
-      referralToken: 'rt',
-      role: SourceMemberRoles.Member,
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'rt',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
   });
 
@@ -2061,10 +2185,12 @@ describe('mutation sharePost', () => {
     await con.getRepository(SquadSource).update('s1', {
       memberPostingRank: sourceRoleRank[SourceMemberRoles.Moderator],
     });
-    await con.getRepository(SourceMember).update(
-      { sourceId: 's1', userId: '1' },
+    await con.getRepository(ContentPreferenceSource).update(
+      { referenceId: 's1', userId: '1' },
       {
-        role: SourceMemberRoles.Moderator,
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
       },
     );
 
@@ -2082,10 +2208,12 @@ describe('mutation sharePost', () => {
     await con.getRepository(SquadSource).update('s1', {
       memberPostingRank: sourceRoleRank[SourceMemberRoles.Moderator],
     });
-    await con.getRepository(SourceMember).update(
-      { sourceId: 's1', userId: '1' },
+    await con.getRepository(ContentPreferenceSource).update(
+      { referenceId: 's1', userId: '1' },
       {
-        role: SourceMemberRoles.Admin,
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
       },
     );
 
@@ -2144,11 +2272,16 @@ describe('mutation sharePost', () => {
           name: 'Watercooler',
           private: false,
         });
-        await con.getRepository(SourceMember).save({
+        await con.getRepository(ContentPreferenceSource).save({
           sourceId: WATERCOOLER_ID,
+          referenceId: WATERCOOLER_ID,
           userId: '1',
-          referralToken: 'watercoolerRt',
-          role: SourceMemberRoles.Member,
+          flags: {
+            role: SourceMemberRoles.Member,
+            referralToken: 'watercoolerRt',
+          },
+          status: ContentPreferenceStatus.Subscribed,
+          feedId: '1',
         });
       });
 
@@ -2309,11 +2442,16 @@ describe('mutation viewPost', () => {
       name: 'Squad',
       private: true,
     });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 's1',
+      referenceId: 's1',
       userId: '1',
-      referralToken: 'rt',
-      role: SourceMemberRoles.Member,
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'rt',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     await con.getRepository(Post).update({ id: 'p1' }, { sourceId: 's1' });
   });
@@ -2395,11 +2533,16 @@ describe('mutation submitExternalLink', () => {
       private: false,
       memberPostingRank: 0,
     });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 's1',
+      referenceId: 's1',
       userId: '1',
-      referralToken: 'rt',
-      role: SourceMemberRoles.Member,
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'rt',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
   });
 
@@ -2625,10 +2768,12 @@ describe('mutation submitExternalLink', () => {
     await con.getRepository(SquadSource).update('s1', {
       memberPostingRank: sourceRoleRank[SourceMemberRoles.Moderator],
     });
-    await con.getRepository(SourceMember).update(
-      { sourceId: 's1', userId: '1' },
+    await con.getRepository(ContentPreferenceSource).update(
+      { referenceId: 's1', userId: '1' },
       {
-        role: SourceMemberRoles.Moderator,
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
       },
     );
 
@@ -2658,10 +2803,12 @@ describe('mutation submitExternalLink', () => {
     await con.getRepository(SquadSource).update('s1', {
       memberPostingRank: sourceRoleRank[SourceMemberRoles.Moderator],
     });
-    await con.getRepository(SourceMember).update(
-      { sourceId: 's1', userId: '1' },
+    await con.getRepository(ContentPreferenceSource).update(
+      { referenceId: 's1', userId: '1' },
       {
-        role: SourceMemberRoles.Admin,
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
       },
     );
 
@@ -2766,11 +2913,16 @@ describe('mutation submitExternalLink', () => {
           name: 'Watercooler',
           private: false,
         });
-        await con.getRepository(SourceMember).save({
+        await con.getRepository(ContentPreferenceSource).save({
           sourceId: WATERCOOLER_ID,
+          referenceId: WATERCOOLER_ID,
           userId: '1',
-          referralToken: 'watercoolerRt',
-          role: SourceMemberRoles.Member,
+          flags: {
+            role: SourceMemberRoles.Member,
+            referralToken: 'watercoolerRt',
+          },
+          status: ContentPreferenceStatus.Subscribed,
+          feedId: '1',
         });
       });
 
@@ -2833,11 +2985,16 @@ describe('mutation submitExternalLink', () => {
       it('should set the correct vordr flags on new post by a bad user', async () => {
         loggedUser = 'vordr';
 
-        await con.getRepository(SourceMember).save({
-          userId: loggedUser,
+        await con.getRepository(ContentPreferenceSource).save({
           sourceId: 's1',
-          role: SourceMemberRoles.Member,
-          referralToken: randomUUID(),
+          referenceId: 's1',
+          userId: loggedUser,
+          flags: {
+            role: SourceMemberRoles.Member,
+            referralToken: randomUUID(),
+          },
+          status: ContentPreferenceStatus.Subscribed,
+          feedId: loggedUser,
         });
 
         const res = await client.mutate(MUTATION, {
@@ -2879,11 +3036,16 @@ describe('mutation submitExternalLink', () => {
       it('should set the correct vordr flags on existing post by bad user', async () => {
         loggedUser = 'vordr';
 
-        await con.getRepository(SourceMember).save({
-          userId: loggedUser,
+        await con.getRepository(ContentPreferenceSource).save({
           sourceId: 's1',
-          role: SourceMemberRoles.Member,
-          referralToken: randomUUID(),
+          referenceId: 's1',
+          userId: loggedUser,
+          flags: {
+            role: SourceMemberRoles.Member,
+            referralToken: randomUUID(),
+          },
+          status: ContentPreferenceStatus.Subscribed,
+          feedId: loggedUser,
         });
 
         const res = await client.mutate(MUTATION, {
@@ -3385,11 +3547,16 @@ describe('mutation createFreeformPost', () => {
           name: 'Watercooler',
           private: false,
         });
-        await con.getRepository(SourceMember).save({
+        await con.getRepository(ContentPreferenceSource).save({
           sourceId: WATERCOOLER_ID,
+          referenceId: WATERCOOLER_ID,
           userId: '1',
-          referralToken: 'watercoolerRt',
-          role: SourceMemberRoles.Member,
+          flags: {
+            role: SourceMemberRoles.Member,
+            referralToken: 'watercoolerRt',
+          },
+          status: ContentPreferenceStatus.Subscribed,
+          feedId: '1',
         });
       });
 
@@ -4027,12 +4194,14 @@ describe('mutation editPost', () => {
     await con
       .getRepository(Post)
       .update({ id: 'p1' }, { type: PostType.Freeform, authorId: '2' });
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '1', sourceId: 'a' },
-        { role: SourceMemberRoles.Moderator },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
     const title = 'Updated title';
     await testMutationErrorCode(
       client,
@@ -4043,12 +4212,14 @@ describe('mutation editPost', () => {
       'FORBIDDEN',
     );
 
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '1', sourceId: 'a' },
-        { role: SourceMemberRoles.Admin },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
+      },
+    );
 
     return await testMutationErrorCode(
       client,
@@ -4063,12 +4234,14 @@ describe('mutation editPost', () => {
   it('should allow moderator to do update of welcome posts', async () => {
     loggedUser = '2';
 
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '2', sourceId: 'a' },
-        { role: SourceMemberRoles.Moderator },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
 
     const content = 'Updated content';
     const res = await client.mutate(MUTATION, {
@@ -4081,12 +4254,14 @@ describe('mutation editPost', () => {
   it('should allow admin to do update of welcome post', async () => {
     loggedUser = '2';
 
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '2', sourceId: 'a' },
-        { role: SourceMemberRoles.Admin },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
+      },
+    );
 
     const content = 'Updated content';
     const res = await client.mutate(MUTATION, {
@@ -4138,12 +4313,14 @@ describe('mutation editPost', () => {
       content: '#Test',
       contentHtml: '<h1>Test</h1>',
     });
-    await con
-      .getRepository(SourceMember)
-      .update(
-        { userId: '2', sourceId: 'a' },
-        { role: SourceMemberRoles.Admin },
-      );
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '2', referenceId: 'a' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
+      },
+    );
 
     const res = await client.mutate(MUTATION, {
       variables: {
@@ -4285,9 +4462,14 @@ describe('mutation updatePinPost', () => {
   it('should update pinnedAt property based on the parameter if user is admin or moderator', async () => {
     loggedUser = '1';
 
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Admin });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Admin,
+        }),
+      },
+    );
 
     const getPost = () => con.getRepository(Post).findOneBy({ id: 'p1' });
 
@@ -4308,9 +4490,14 @@ describe('mutation updatePinPost', () => {
     const unpinnedAgain = await getPost();
     expect(unpinnedAgain.pinnedAt).toBeNull();
 
-    await con
-      .getRepository(SourceMember)
-      .update({ userId: '1' }, { role: SourceMemberRoles.Moderator });
+    await con.getRepository(ContentPreferenceSource).update(
+      { userId: '1' },
+      {
+        flags: updateFlagsStatement<ContentPreferenceSource>({
+          role: SourceMemberRoles.Moderator,
+        }),
+      },
+    );
 
     await client.mutate(MUTATION, {
       variables: { id: 'p1', pinned: true },
@@ -4371,9 +4558,14 @@ describe('mutation swapPinnedPosts', () => {
 
   describe('when authenticated w/ permissions', () => {
     beforeEach(async () => {
-      await con
-        .getRepository(SourceMember)
-        .update({ userId: '1' }, { role: SourceMemberRoles.Admin });
+      await con.getRepository(ContentPreferenceSource).update(
+        { userId: '1' },
+        {
+          flags: updateFlagsStatement<ContentPreferenceSource>({
+            role: SourceMemberRoles.Admin,
+          }),
+        },
+      );
     });
 
     it('should throw a validation error if posts are not pinned', async () => {
@@ -5496,7 +5688,6 @@ describe('query postCodeSnippets', () => {
       variables: { id: 'p1' },
     });
 
-    console.log(JSON.stringify(res.data, null, 2));
     expect(res.errors).toBeFalsy();
     expect(res.data).toMatchObject({
       postCodeSnippets: {
@@ -5729,14 +5920,6 @@ describe('Source post moderation edit/delete', () => {
 
   beforeEach(async () => {
     await saveSquadFixtures();
-    await con.getRepository(SourceMember).save([
-      {
-        sourceId: 'm',
-        userId: '4',
-        role: SourceMemberRoles.Member,
-        referralToken: 'r4',
-      },
-    ]);
     await con.getRepository(SourcePostModeration).save([
       {
         id: pendingId,

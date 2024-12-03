@@ -1,6 +1,4 @@
 import { generateTypedNotificationWorker } from './worker';
-import { SourceMember } from '../../entity';
-import { In } from 'typeorm';
 import { SourceMemberRoles } from '../../roles';
 import { NotificationType } from '../../notifications/common';
 import { NotificationPostModerationContext } from '../../notifications';
@@ -8,6 +6,7 @@ import { SourcePostModerationStatus } from '../../entity/SourcePostModeration';
 import { getPostModerationContext } from './utils';
 import { logger } from '../../logger';
 import { TypeORMQueryFailedError } from '../../errors';
+import { ContentPreferenceSource } from '../../entity/contentPreference/ContentPreferenceSource';
 
 const worker =
   generateTypedNotificationWorker<'api.v1.source-post-moderation-submitted'>({
@@ -19,13 +18,15 @@ const worker =
 
       try {
         const moderationCtx = await getPostModerationContext(con, post);
-        const mods = await con.getRepository(SourceMember).find({
-          select: ['userId'],
-          where: {
-            sourceId: post.sourceId,
-            role: In([SourceMemberRoles.Admin, SourceMemberRoles.Moderator]),
-          },
-        });
+        const mods = await con
+          .getRepository(ContentPreferenceSource)
+          .createQueryBuilder()
+          .select('"userId"')
+          .where('"referenceId" = :sourceId', { sourceId: post.sourceId })
+          .andWhere(`flags->>'role' IN (:...roles)`, {
+            roles: [SourceMemberRoles.Admin, SourceMemberRoles.Moderator],
+          })
+          .getRawMany<Pick<ContentPreferenceSource, 'userId'>>();
 
         const ctx: NotificationPostModerationContext = {
           ...moderationCtx,

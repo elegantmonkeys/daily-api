@@ -15,9 +15,9 @@ import {
   Comment,
   User,
   ArticlePost,
-  SourceMember,
   SourceType,
   CommentMention,
+  Feed,
 } from '../src/entity';
 import { SourceMemberRoles } from '../src/roles';
 import { sourcesFixture } from './fixture/source';
@@ -44,6 +44,8 @@ import {
   getRedisObjectExpiry,
 } from '../src/redis';
 import { badUsersFixture } from './fixture';
+import { ContentPreferenceStatus } from '../src/entity/contentPreference/types';
+import { ContentPreferenceSource } from '../src/entity/contentPreference/ContentPreferenceSource';
 
 let con: DataSource;
 let state: GraphQLTestingState;
@@ -77,6 +79,11 @@ beforeEach(async () => {
   await saveFixtures(con, ArticlePost, sharedPostsFixture);
   await saveFixtures(con, PostTag, postTagsFixture);
   await con.getRepository(User).save(usersFixture);
+  await saveFixtures(
+    con,
+    Feed,
+    usersFixture.map((item) => ({ id: item.id, userId: item.id })),
+  );
   await con.getRepository(User).save(badUsersFixture);
   await con.getRepository(Comment).save([
     {
@@ -190,20 +197,30 @@ const saveSquadFixture = async (sourceId: string) => {
     },
   ]);
   await con.getRepository(Source).update({ id: sourceId }, { private: true });
-  await con.getRepository(SourceMember).save([
+  await con.getRepository(ContentPreferenceSource).save([
     {
-      userId: '1',
       sourceId,
-      role: SourceMemberRoles.Admin,
-      referralToken: 'rt1',
+      referenceId: sourceId,
+      userId: '1',
       createdAt: new Date(2022, 11, 19),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'rt',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     },
     {
-      userId: 'sample1',
       sourceId,
-      role: SourceMemberRoles.Member,
-      referralToken: 'rt2',
+      referenceId: sourceId,
+      userId: 'sample1',
       createdAt: new Date(2022, 11, 19),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 'rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     },
   ]);
 };
@@ -913,11 +930,16 @@ describe('mutation commentOnPost', () => {
     await con
       .getRepository(Post)
       .update({ id: 'p1' }, { private: false, sourceId: 'a' });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
+      referenceId: 'a',
       userId: '1',
-      referralToken: 'rt2',
-      role: SourceMemberRoles.Blocked,
+      flags: {
+        role: SourceMemberRoles.Blocked,
+        referralToken: 'rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     return testMutationErrorCode(
       client,
@@ -1152,11 +1174,16 @@ describe('mutation commentOnComment', () => {
     await con
       .getRepository(Post)
       .update({ id: 'p1' }, { private: false, sourceId: 'a' });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
+      referenceId: 'a',
       userId: '1',
-      referralToken: 'rt2',
-      role: SourceMemberRoles.Blocked,
+      flags: {
+        role: SourceMemberRoles.Blocked,
+        referralToken: 'rt2',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
 
     return testMutationErrorCode(
@@ -1349,11 +1376,16 @@ describe('mutation deleteComment', () => {
 
   it("should forbidden when other user doesn't have the right permissions", async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).insert({
-      userId: '1',
+    await con.getRepository(ContentPreferenceSource).insert({
       sourceId: 'squad',
-      role: SourceMemberRoles.Member,
-      referralToken: 's1',
+      referenceId: 'squad',
+      userId: '1',
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: 's1',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     return testMutationErrorCode(
       client,
@@ -1367,11 +1399,16 @@ describe('mutation deleteComment', () => {
 
   it('should delete a comment if source admin has permissions', async () => {
     loggedUser = '1';
-    await con.getRepository(SourceMember).insert({
-      userId: '1',
+    await con.getRepository(ContentPreferenceSource).insert({
       sourceId: 'squad',
-      role: SourceMemberRoles.Admin,
-      referralToken: 's1',
+      referenceId: 'squad',
+      userId: '1',
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: 's1',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
     const before = await con.getRepository(Comment).findBy({ postId: 'p1' });
     expect(before.length).toEqual(5);

@@ -15,13 +15,7 @@ import {
   UserIntegrationType,
 } from '../src/entity/UserIntegration';
 import { usersFixture } from './fixture/user';
-import {
-  Source,
-  SourceMember,
-  SourceType,
-  SquadSource,
-  User,
-} from '../src/entity';
+import { Source, SquadSource, User, SourceType, Feed } from '../src/entity';
 import { Context } from '../src/Context';
 import { sourcesFixture } from './fixture/source';
 import { encrypt } from '../src/common';
@@ -31,6 +25,8 @@ import {
 } from '../src/entity/UserSourceIntegration';
 import { SourceMemberRoles } from '../src/roles';
 import { addSeconds } from 'date-fns';
+import { ContentPreferenceStatus } from '../src/entity/contentPreference/types';
+import { ContentPreferenceSource } from '../src/entity/contentPreference/ContentPreferenceSource';
 
 const slackPostMessage = jest.fn().mockResolvedValue({
   ok: true,
@@ -116,6 +112,11 @@ describe('slack integration', () => {
     const createdAt = new Date();
 
     await saveFixtures(con, User, usersFixture);
+    await saveFixtures(
+      con,
+      Feed,
+      usersFixture.map((user) => ({ id: user.id, userId: user.id })),
+    );
     await saveFixtures(con, Source, sourcesFixture);
     await con.getRepository(UserIntegration).save([
       {
@@ -165,27 +166,42 @@ describe('slack integration', () => {
         private: true,
       },
     ]);
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 'squadslack',
+        referenceId: 'squadslack',
         userId: '1',
-        role: SourceMemberRoles.Admin,
-        referralToken: 'squadslacktoken1',
         createdAt: addSeconds(createdAt, 1),
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: 'squadslacktoken1',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
         sourceId: 'squadslack',
+        referenceId: 'squadslack',
         userId: '2',
-        role: SourceMemberRoles.Admin,
-        referralToken: 'squadslacktoken2',
         createdAt: addSeconds(createdAt, 2),
+        flags: {
+          role: SourceMemberRoles.Admin,
+          referralToken: 'squadslacktoken2',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '2',
       },
       {
         sourceId: 'squadslack',
+        referenceId: 'squadslack',
         userId: '3',
-        role: SourceMemberRoles.Member,
-        referralToken: 'squadslacktoken3',
         createdAt: addSeconds(createdAt, 3),
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'squadslacktoken3',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '3',
       },
     ]);
   });

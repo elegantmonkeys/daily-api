@@ -11,6 +11,7 @@ import {
   Alerts,
   UserTopReader,
   SquadSource,
+  SourceType,
 } from '../../entity';
 import { messageToJson, Worker } from '../worker';
 import {
@@ -20,7 +21,6 @@ import {
   Post,
   Settings,
   SourceFeed,
-  SourceMember,
   SourceRequest,
   Submission,
   SubmissionStatus,
@@ -124,7 +124,13 @@ import {
   SourcePostModeration,
   SourcePostModerationStatus,
 } from '../../entity/SourcePostModeration';
+import { ContentPreferenceSource } from '../../entity/contentPreference/ContentPreferenceSource';
+import { ContentPreference } from '../../entity/contentPreference/ContentPreference';
 import { cleanupSourcePostModerationNotifications } from '../../notifications/common';
+import {
+  ContentPreferenceStatus,
+  ContentPreferenceType,
+} from '../../entity/contentPreference/types';
 
 const isFreeformPostLongEnough = (
   freeform: ChangeMessage<FreeformPost>,
@@ -843,18 +849,40 @@ const onUserStateChange = async (
 const onSourceMemberChange = async (
   con: DataSource,
   logger: FastifyBaseLogger,
-  data: ChangeMessage<SourceMember>,
+  data: ChangeMessage<ContentPreferenceSource>,
 ) => {
-  if (data.payload.op === 'c') {
-    await notifyMemberJoinedSource(logger, data.payload.after!);
-  }
-  if (data.payload.op === 'u') {
-    if (data.payload.before!.role !== data.payload.after!.role) {
-      await notifySourceMemberRoleChanged(
-        logger,
-        data.payload.before!.role,
-        data.payload.after!,
-      );
+  const contentPreferenceType = data.payload.after!.type;
+
+  if (contentPreferenceType === ContentPreferenceType.Source) {
+    const sourceId = data.payload.after!.sourceId;
+
+    const source = await con
+      .getRepository(Source)
+      .createQueryBuilder()
+      .select('type')
+      .where({
+        id: sourceId,
+      })
+      .getRawOne<Pick<Source, 'type'>>();
+
+    if (source?.type !== SourceType.Squad) {
+      return;
+    }
+
+    const isMemberBlockingSource =
+      data.payload.after?.status === ContentPreferenceStatus.Blocked;
+
+    if (data.payload.op === 'c' && !isMemberBlockingSource) {
+      await notifyMemberJoinedSource(logger, data.payload.after!);
+    }
+    if (data.payload.op === 'u') {
+      if (data.payload.before!.flags.role !== data.payload.after!.flags.role) {
+        await notifySourceMemberRoleChanged(
+          logger,
+          data.payload.before!.flags.role!,
+          data.payload.after!,
+        );
+      }
     }
   }
 };
@@ -1156,7 +1184,7 @@ const worker: Worker = {
         case getTableName(con, UserState):
           await onUserStateChange(con, logger, data);
           break;
-        case getTableName(con, SourceMember):
+        case getTableName(con, ContentPreference):
           await onSourceMemberChange(con, logger, data);
           break;
         case getTableName(con, Feature):

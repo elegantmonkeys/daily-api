@@ -1,13 +1,7 @@
 import { DataSource } from 'typeorm';
 import worker from '../../../src/workers/notifications/sourcePostModerationApprovedNotification';
 import createOrGetConnection from '../../../src/db';
-import {
-  Post,
-  Source,
-  SourceMember,
-  SourceType,
-  User,
-} from '../../../src/entity';
+import { Feed, Post, Source, SourceType, User } from '../../../src/entity';
 import { sourcesFixture, usersFixture } from '../../fixture';
 import { workers } from '../../../src/workers';
 import { invokeNotificationWorker, saveFixtures } from '../../helpers';
@@ -15,6 +9,8 @@ import { SourcePostModerationStatus } from '../../../src/entity/SourcePostModera
 import { SourceMemberRoles } from '../../../src/roles';
 import { NotificationPostModerationContext } from '../../../src/notifications';
 import { postsFixture } from '../../fixture/post';
+import { ContentPreferenceStatus } from '../../../src/entity/contentPreference/types';
+import { ContentPreferenceSource } from '../../../src/entity/contentPreference/ContentPreferenceSource';
 
 let con: DataSource;
 
@@ -26,6 +22,11 @@ beforeEach(async () => {
   jest.resetAllMocks();
   await saveFixtures(con, Source, sourcesFixture);
   await saveFixtures(con, User, usersFixture);
+  await saveFixtures(
+    con,
+    Feed,
+    usersFixture.map((u) => ({ id: u.id, userId: u.id })),
+  );
   await saveFixtures(con, Post, postsFixture);
 });
 
@@ -74,11 +75,16 @@ describe('SourcePostModerationSubmitted', () => {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
-    await con.getRepository(SourceMember).save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: 'a',
+      referenceId: 'a',
       userId: '1',
-      role: SourceMemberRoles.Admin,
-      referralToken: 'a',
+      flags: {
+        role: SourceMemberRoles.Admin,
+        referralToken: 'a',
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: '1',
     });
 
     const result = await invokeNotificationWorker(worker, { post });
@@ -100,24 +106,39 @@ describe('SourcePostModerationSubmitted', () => {
     await con
       .getRepository(Source)
       .update({ id: 'a' }, { type: SourceType.Squad });
-    await con.getRepository(SourceMember).save([
+    await con.getRepository(ContentPreferenceSource).save([
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '1',
-        role: SourceMemberRoles.Moderator,
-        referralToken: 'a',
+        flags: {
+          role: SourceMemberRoles.Moderator,
+          referralToken: 'a',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '1',
       },
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '3',
-        role: SourceMemberRoles.Member,
-        referralToken: 'b',
+        flags: {
+          role: SourceMemberRoles.Member,
+          referralToken: 'b',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '3',
       },
       {
         sourceId: 'a',
+        referenceId: 'a',
         userId: '4',
-        role: SourceMemberRoles.Moderator,
-        referralToken: 'c',
+        flags: {
+          role: SourceMemberRoles.Moderator,
+          referralToken: 'c',
+        },
+        status: ContentPreferenceStatus.Subscribed,
+        feedId: '4',
       },
     ]);
 

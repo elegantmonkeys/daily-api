@@ -6,10 +6,12 @@ import { User, Source, Feed } from '../../src/entity';
 import { ghostUser, PubSubSchema } from '../../src/common';
 import { typedWorkers } from '../../src/workers';
 import createOrGetConnection from '../../src/db';
-import { DataSource } from 'typeorm';
+import { DataSource, Not } from 'typeorm';
 import { usersFixture } from '../fixture/user';
 import { SourceMemberRoles } from '../../src/roles';
 import { randomUUID } from 'crypto';
+import { ContentPreferenceSource } from '../../src/entity/contentPreference/ContentPreferenceSource';
+import { ContentPreferenceStatus } from '../../src/entity/contentPreference/types';
 
 const PLUS_MEMBER_SQUAD_ID = '05862288-bace-4723-9218-d30fab6ae96d';
 
@@ -80,13 +82,16 @@ describe('userUpdatedPlusSubscription', () => {
       newProfile: newBase,
       user: base,
     } as unknown as PubSubSchema['user-updated']);
-    const sourceMember = await con.getRepository('SourceMember').findOneBy({
-      sourceId: PLUS_MEMBER_SQUAD_ID,
-      userId: newBase.id,
-    });
-    expect(sourceMember.role).toEqual(SourceMemberRoles.Member);
-    expect(sourceMember.sourceId).toEqual(PLUS_MEMBER_SQUAD_ID);
-    expect(sourceMember.userId).toEqual(newBase.id);
+    const sourceMember = await con
+      .getRepository(ContentPreferenceSource)
+      .findOneBy({
+        referenceId: PLUS_MEMBER_SQUAD_ID,
+        userId: newBase.id,
+        status: Not(ContentPreferenceStatus.Blocked),
+      });
+    expect(sourceMember?.flags.role).toEqual(SourceMemberRoles.Member);
+    expect(sourceMember?.referenceId).toEqual(PLUS_MEMBER_SQUAD_ID);
+    expect(sourceMember?.userId).toEqual(newBase.id);
   });
 
   it('should not add user if user is ghost user', async () => {
@@ -95,10 +100,13 @@ describe('userUpdatedPlusSubscription', () => {
       newProfile: before,
       user: before,
     } as unknown as PubSubSchema['user-updated']);
-    const sourceMember = await con.getRepository('SourceMember').findOneBy({
-      sourceId: PLUS_MEMBER_SQUAD_ID,
-      userId: base.id,
-    });
+    const sourceMember = await con
+      .getRepository(ContentPreferenceSource)
+      .findOneBy({
+        referenceId: PLUS_MEMBER_SQUAD_ID,
+        userId: base.id,
+        status: Not(ContentPreferenceStatus.Blocked),
+      });
     expect(sourceMember).toEqual(null);
   });
 
@@ -108,10 +116,13 @@ describe('userUpdatedPlusSubscription', () => {
       newProfile: before,
       user: before,
     } as unknown as PubSubSchema['user-updated']);
-    const sourceMember = await con.getRepository('SourceMember').findOneBy({
-      sourceId: PLUS_MEMBER_SQUAD_ID,
-      userId: base.id,
-    });
+    const sourceMember = await con
+      .getRepository(ContentPreferenceSource)
+      .findOneBy({
+        referenceId: PLUS_MEMBER_SQUAD_ID,
+        userId: base.id,
+        status: Not(ContentPreferenceStatus.Blocked),
+      });
     expect(sourceMember).toEqual(null);
   });
 
@@ -121,10 +132,13 @@ describe('userUpdatedPlusSubscription', () => {
       newProfile: before,
       user: before,
     } as unknown as PubSubSchema['user-updated']);
-    const sourceMember = await con.getRepository('SourceMember').findOneBy({
-      sourceId: PLUS_MEMBER_SQUAD_ID,
-      userId: base.id,
-    });
+    const sourceMember = await con
+      .getRepository(ContentPreferenceSource)
+      .findOneBy({
+        referenceId: PLUS_MEMBER_SQUAD_ID,
+        userId: base.id,
+        status: Not(ContentPreferenceStatus.Blocked),
+      });
     expect(sourceMember).toEqual(null);
   });
 
@@ -137,19 +151,27 @@ describe('userUpdatedPlusSubscription', () => {
       newProfile: before,
       user: before,
     } as unknown as PubSubSchema['user-updated']);
-    const sourceMember = await con.getRepository('SourceMember').findOneBy({
-      sourceId: PLUS_MEMBER_SQUAD_ID,
-      userId: base.id,
-    });
+    const sourceMember = await con
+      .getRepository(ContentPreferenceSource)
+      .findOneBy({
+        referenceId: PLUS_MEMBER_SQUAD_ID,
+        userId: base.id,
+        status: Not(ContentPreferenceStatus.Blocked),
+      });
     expect(sourceMember).toEqual(null);
   });
 
   it('should remove user from squad', async () => {
-    await con.getRepository('SourceMember').save({
+    await con.getRepository(ContentPreferenceSource).save({
       sourceId: PLUS_MEMBER_SQUAD_ID,
+      referenceId: PLUS_MEMBER_SQUAD_ID,
       userId: base.id,
-      role: SourceMemberRoles.Member,
-      referralToken: new randomUUID(),
+      flags: {
+        role: SourceMemberRoles.Member,
+        referralToken: randomUUID(),
+      },
+      status: ContentPreferenceStatus.Subscribed,
+      feedId: base.id,
     });
     const oldBase = {
       ...base,
@@ -160,10 +182,13 @@ describe('userUpdatedPlusSubscription', () => {
       user: oldBase,
     } as unknown as PubSubSchema['user-updated']);
 
-    const sourceMember = await con.getRepository('SourceMember').findOneBy({
-      sourceId: PLUS_MEMBER_SQUAD_ID,
-      userId: base.id,
-    });
+    const sourceMember = await con
+      .getRepository(ContentPreferenceSource)
+      .findOneBy({
+        referenceId: PLUS_MEMBER_SQUAD_ID,
+        userId: base.id,
+        status: Not(ContentPreferenceStatus.Blocked),
+      });
     expect(sourceMember).toEqual(null);
   });
 });

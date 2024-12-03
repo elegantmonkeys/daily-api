@@ -1,5 +1,5 @@
 import { messageToJson } from '../worker';
-import { SourceMember, SourceType, UserPost } from '../../entity';
+import { SourceType, UserPost } from '../../entity';
 import {
   NotificationPostContext,
   NotificationUpvotersContext,
@@ -7,9 +7,9 @@ import {
 import { NotificationType } from '../../notifications/common';
 import { NotificationWorker } from './worker';
 import { buildPostContext, uniquePostOwners, UPVOTE_MILESTONES } from './utils';
-import { In, Not } from 'typeorm';
 import { SourceMemberRoles } from '../../roles';
 import { UserVote } from '../../types';
+import { ContentPreferenceSource } from '../../entity/contentPreference/ContentPreferenceSource';
 
 interface Data {
   userId: string;
@@ -46,11 +46,16 @@ const worker: NotificationWorker = {
     };
 
     if (source.type === SourceType.Squad) {
-      const members = await con.getRepository(SourceMember).findBy({
-        userId: In(users),
-        sourceId: source.id,
-        role: Not(SourceMemberRoles.Blocked),
-      });
+      const members = await con
+        .getRepository(ContentPreferenceSource)
+        .createQueryBuilder()
+        .select('"userId"')
+        .where('"userId" IN (:...users)', { users })
+        .where('"referenceId" = :sourceId', { sourceId: source.id })
+        .andWhere("flags->>'role' != :role", {
+          role: SourceMemberRoles.Blocked,
+        })
+        .getRawMany<Pick<ContentPreferenceSource, 'userId'>>();
 
       if (!members.length) {
         return;
