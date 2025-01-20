@@ -26,10 +26,6 @@ import { ValueType } from '@opentelemetry/api';
 
 const counterMap = {
   api: {
-    forceRefresh: {
-      name: 'force_refresh',
-      description: 'How many times a feed force refresh has been triggered',
-    },
     requests: {
       name: 'requests',
       description: 'How many requests have been processed',
