@@ -568,8 +568,14 @@ const getSourcePrivacy = async ({
     }
 
     const source = await query.getOne();
-    return source?.private;
+
+    // if source is not found this will return undefined
+    // and DB will default to false, which means post will be public
+    return !!source?.private;
   } catch (err) {
+    // in case of an error it will return undefined
+    // and DB will default to false, which means post will be public
+
     logger.error({ data, err }, 'failed find source for post');
   }
 };
