@@ -22,6 +22,7 @@ import { collectionUpdated } from './collectionUpdated';
 import devCardUnlocked from './devCardUnlocked';
 import postBookmarkReminder from './postBookmarkReminder';
 import userStreakResetNotification from './userStreakResetNotification';
+import userGiftedPlusNotification from './userGiftedPlusNotification';
 import squadFeaturedUpdated from './squadFeaturedUpdated';
 import sourcePostModerationSubmittedNotification from './sourcePostModerationSubmittedNotification';
 import sourcePostModerationApprovedNotification from './sourcePostModerationApprovedNotification';
@@ -94,6 +95,7 @@ const notificationWorkers: NotificationWorker[] = [
   sourcePostModerationApprovedNotification,
   sourcePostModerationRejectedNotification,
   userTopReaderAdded,
+  userGiftedPlusNotification
 ];
 
 export const workers = [...notificationWorkers.map(notificationWorkerToWorker)];

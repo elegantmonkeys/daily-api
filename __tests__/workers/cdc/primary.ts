@@ -149,6 +149,8 @@ import {
 } from '../../../src/entity/SourcePostModeration';
 import { NotificationType } from '../../../src/notifications/common';
 import type { UserReport } from '../../../src/entity/UserReport';
+import { SubscriptionCycles } from '../../../src/paddle';
+import { addYears } from 'date-fns';
 
 jest.mock('../../../src/common', () => ({
   ...(jest.requireActual('../../../src/common') as Record<string, unknown>),
@@ -893,6 +895,30 @@ describe('user', () => {
     expect(jest.mocked(notifyUserReadmeUpdated).mock.calls[0].slice(1)).toEqual(
       [after],
     );
+  });
+
+  it('should notify on gift plus subscription', async () => {
+    const after: ChangeObject<ObjectType> = {
+      ...base,
+      subscriptionFlags: JSON.stringify({
+        cycle: SubscriptionCycles.Yearly,
+        gifterId: '2',
+        giftExpirationDate: addYears(new Date(), 1),
+      }),
+    };
+    await expectSuccessfulBackground(
+      worker,
+      mockChangeMessage<ObjectType>({
+        after,
+        before: base,
+        table: 'user',
+        op: 'u',
+      }),
+    );
+    expectTypedEvent('user-updated', {
+      user: base,
+      newProfile: after,
+    } as unknown as PubSubSchema['user-updated']);
   });
 });
 

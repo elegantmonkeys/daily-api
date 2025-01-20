@@ -5,7 +5,7 @@ import { SourceMemberRoles } from '../roles';
 import { SourceMember, User } from '../entity';
 import { queryReadReplica } from '../common/queryReadReplica';
 
-const PLUS_MEMBER_SQUAD_ID = '05862288-bace-4723-9218-d30fab6ae96d';
+export const PLUS_MEMBER_SQUAD_ID = '05862288-bace-4723-9218-d30fab6ae96d';
 const worker: TypedWorker<'user-updated'> = {
   subscription: 'api.user-updated-plus-subscribed-squad',
   handler: async (message, con, log) => {

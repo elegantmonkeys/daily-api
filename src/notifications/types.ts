@@ -13,6 +13,8 @@ import {
   UserStreak,
   type Keyword,
   type UserTopReader,
+  type UserSubscriptionFlags,
+  SquadSource,
 } from '../entity';
 import { ChangeObject } from '../types';
 import { DeepPartial } from 'typeorm';
@@ -66,6 +68,13 @@ export type NotificationStreakContext = NotificationBaseContext & {
   streak: Omit<Reference<UserStreak>, 'lastViewAt'> & {
     lastViewAt: number;
   };
+};
+
+export type NotificationGiftPlusContext = NotificationBaseContext & {
+  gifter: Reference<User>;
+  recipient: Reference<User>;
+  squad: Reference<SquadSource>;
+  subscriptionFlags: UserSubscriptionFlags;
 };
 
 export type NotificationCommenterContext = NotificationCommentContext & {

@@ -91,6 +91,7 @@ export const notificationToTemplateId: Record<NotificationType, string> = {
   squad_featured: '56',
   user_post_added: '58',
   user_given_top_reader: CioTransactionalMessageTemplateId.UserGivenTopReader,
+  user_gifted_plus: '', // todo: add template id
 };
 
 type TemplateData = Record<string, unknown>;
@@ -855,6 +856,9 @@ const notificationToTemplateData: Record<NotificationType, TemplateDataFunc> = {
       issuedAt: formatMailDate(userTopReader.issuedAt),
       keyword: keyword?.flags?.title || keyword.value,
     };
+  },
+  user_gifted_plus: async () => {
+    return null;
   },
 };
 
